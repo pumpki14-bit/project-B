@@ -131,7 +131,7 @@ background-size:350% 100%;animation:titleFlow 8s linear infinite}
 .coinSettlement{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.8);z-index:9000;padding:16px 22px;border-radius:18px;background:#181818;color:#fff;font-size:22px;font-weight:950;box-shadow:0 10px 35px #0007;opacity:0;animation:settlePop 2.5s ease forwards;text-align:center}.coinSettlement.win{box-shadow:0 0 28px #ffd54f,0 10px 35px #0007}.coinSettlement.lose{box-shadow:0 0 22px #ff6b6b,0 10px 35px #0007}
 @keyframes settlePop{15%{opacity:1;transform:translateX(-50%) scale(1.08)}75%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.95)}}
 
-/* v13.7.6 FRIEND SPECTATE - based on v13.7.2
+/* v13.7.7 LAST MOVE - based on v13.7.2
 /* v13.7.2 iOS Safari native-click fix */
 button,[role="button"],select,input{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,.10)}
 button{-webkit-appearance:none;appearance:none;cursor:pointer}
@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.6 FRIEND SPECTATE</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.7 LAST MOVE</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -898,7 +898,23 @@ function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){
 box.classList.remove('hidden');box.classList.remove('win','lose','draw');if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent='팽팽한 대국이었습니다.'}else if(state.winner===myColor){box.classList.add('win');$('#resultBig').textContent='🎉 승리!';$('#resultSub').textContent='축하합니다. 전적에 1승이 기록됩니다.'}else{box.classList.add('lose');$('#resultBig').textContent='😵 패배';$('#resultSub').textContent='이번 판은 상대의 승리입니다.'}}
 function renderRequest(){const u=state.requests?.undo,r=state.requests?.rematch,box=$('#requestBox');let req=null,type='';if(u?.from&&u.from!==myId){req=u;type='undo'}else if(r?.from&&r.from!==myId){req=r;type='rematch'}if(req){box.classList.remove('hidden');box.dataset.type=type;$('#requestText').textContent=type==='undo'?`${req.name||'상대'}가 한 수 무르기를 요청했습니다.`:`${req.name||'상대'}가 재대결을 요청했습니다.`}else box.classList.add('hidden');let mineUndo=u?.from===myId,mineRematch=r?.from===myId;$('#undo').textContent=mineUndo?'무르기 요청 중…':'무르기 요청';$('#rematch').textContent=mineRematch?'재대결 요청 중…':'재대결';$('#undo').disabled=state.status!=='playing'||moves().length===0||!!u;$('#rematch').disabled=state.status!=='finished'||!!r}
 function updatePickUI(){const ok=pending&&state?.status==='playing'&&state.turn===myColor;$('#place').disabled=!ok;$('#clearPick').disabled=!pending;$('#pickMsg').textContent=pending?`${String.fromCharCode(65+pending.x)}${pending.y+1} 선택됨 · 착수를 눌러 확정하세요.`:(state?.turn===myColor&&state?.status==='playing'?'빈 교차점을 누른 뒤 착수 버튼을 눌러주세요.':'상대의 착수를 기다리는 중입니다.')}
-function draw(b){const cv=$('#board'),c=cv.getContext('2d');c.fillStyle='#d6a75e';c.fillRect(0,0,640,640);c.strokeStyle='#4e361f';c.lineWidth=1;for(let i=0;i<N;i++){let q=P+i*S;c.beginPath();c.moveTo(P,q);c.lineTo(640-P,q);c.stroke();c.beginPath();c.moveTo(q,P);c.lineTo(q,640-P);c.stroke()}[3,7,11].forEach(y=>[3,7,11].forEach(x=>{c.beginPath();c.fillStyle='#4e361f';c.arc(P+x*S,P+y*S,3.5,0,Math.PI*2);c.fill()}));for(let y=0;y<N;y++)for(let x=0;x<N;x++){let p=b[y*N+x];if(!p)continue;c.beginPath();c.arc(P+x*S,P+y*S,S*.4,0,Math.PI*2);c.fillStyle=p===1?'#161616':'#f8f8f8';c.fill();c.strokeStyle='#333';c.stroke()}if(pending){let px=P+pending.x*S,py=P+pending.y*S;c.beginPath();c.arc(px,py,S*.4,0,Math.PI*2);c.fillStyle=myColor===1?'rgba(20,20,20,.48)':'rgba(255,255,255,.68)';c.fill();c.strokeStyle='#b42318';c.lineWidth=3;c.stroke();c.beginPath();c.arc(px,py,5,0,Math.PI*2);c.fillStyle='#b42318';c.fill()}}
+function draw(b){const cv=$('#board'),c=cv.getContext('2d');
+ let lastMovePos=null;
+ const ms=moves();
+ if(ms.length){
+  const lm=ms[ms.length-1];
+  if(typeof lm==='number')lastMovePos={x:lm%N,y:Math.floor(lm/N)};
+  else if(lm&&Number.isFinite(Number(lm.x))&&Number.isFinite(Number(lm.y)))lastMovePos={x:Number(lm.x),y:Number(lm.y)};
+  else if(lm&&Number.isFinite(Number(lm.i))){const li=Number(lm.i);lastMovePos={x:li%N,y:Math.floor(li/N)}}
+ }c.fillStyle='#d6a75e';c.fillRect(0,0,640,640);c.strokeStyle='#4e361f';c.lineWidth=1;for(let i=0;i<N;i++){let q=P+i*S;c.beginPath();c.moveTo(P,q);c.lineTo(640-P,q);c.stroke();c.beginPath();c.moveTo(q,P);c.lineTo(q,640-P);c.stroke()}[3,7,11].forEach(y=>[3,7,11].forEach(x=>{c.beginPath();c.fillStyle='#4e361f';c.arc(P+x*S,P+y*S,3.5,0,Math.PI*2);c.fill()}));for(let y=0;y<N;y++)for(let x=0;x<N;x++){let p=b[y*N+x];if(!p)continue;c.beginPath();c.arc(P+x*S,P+y*S,S*.4,0,Math.PI*2);c.fillStyle=p===1?'#161616':'#f8f8f8';c.fill();c.strokeStyle='#333';c.stroke()}
+ if(lastMovePos){
+  const lx=P+lastMovePos.x*S,ly=P+lastMovePos.y*S;
+  c.beginPath();c.arc(lx,ly,5,0,Math.PI*2);
+  c.fillStyle='#e53935';c.fill();
+  c.beginPath();c.arc(lx,ly,S*.19,0,Math.PI*2);
+  c.strokeStyle='rgba(229,57,53,.9)';c.lineWidth=2;c.stroke();
+ }
+ if(pending){let px=P+pending.x*S,py=P+pending.y*S;c.beginPath();c.arc(px,py,S*.4,0,Math.PI*2);c.fillStyle=myColor===1?'rgba(20,20,20,.48)':'rgba(255,255,255,.68)';c.fill();c.strokeStyle='#b42318';c.lineWidth=3;c.stroke();c.beginPath();c.arc(px,py,5,0,Math.PI*2);c.fillStyle='#b42318';c.fill()}}
 function win(b,x,y,p){return isWinningMove(b,x,y,p)}
 let lastPickAt=0;function pickBoard(clientX,clientY){
  if(spectatorMode)return;const now=Date.now();if(now-lastPickAt<180)return;lastPickAt=now;if(!state){msg('gameMsg','게임 정보를 불러오는 중입니다.');return}if(state.status!=='playing'){msg('gameMsg','아직 대국이 시작되지 않았습니다.');return}if(state.turn!==myColor){msg('gameMsg','지금은 상대 차례입니다.');return}const cv=$('#board'),r=cv.getBoundingClientRect(),x=Math.round(((clientX-r.left)*640/r.width-P)/S),y=Math.round(((clientY-r.top)*640/r.height-P)/S);if(x<0||x>=N||y<0||y>=N)return;if(arr()[y*N+x]){msg('gameMsg','이미 돌이 있는 자리입니다.');return}pending={x,y};msg('gameMsg','');updatePickUI();draw(arr())}
