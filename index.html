@@ -19,7 +19,7 @@ canvas{touch-action:none!important}
 .friendName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.friendTop .badge{margin-left:auto;white-space:nowrap;font-size:12px}
 .friendActions{display:flex;gap:8px;margin-top:11px}.friendActions .challengeBtn{flex:1;min-width:0}.friendActions button{min-height:46px}
 .challengeBtn.pending{background:#f4f1ea;color:#555;border-color:#d8d1c6}.friendDelete{flex:0 0 50px;padding:0}
-.onlineDot{color:#16803a}.offlineDot{color:#888}#friendsPanel .friendList{gap:10px}
+.onlineDot{color:#16803a}.playingDot{color:#d93025;font-weight:900}.offlineDot{color:#888}.friendMoreMenu{display:flex;gap:7px;margin-top:7px}.friendMoreMenu.hidden{display:none}.friendMoreMenu button{min-height:40px;font-size:13px}#friendsPanel .friendList{gap:10px}
 #friendsPanel input{min-width:0}.friendCodeBox .row{flex-wrap:nowrap}
 @media(max-width:430px){.friendCode{font-size:17px;letter-spacing:.7px}.friendTop{align-items:flex-start}.friendTop .badge{font-size:11px}.friendCard{padding:11px}}
 
@@ -131,7 +131,7 @@ background-size:350% 100%;animation:titleFlow 8s linear infinite}
 .coinSettlement{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.8);z-index:9000;padding:16px 22px;border-radius:18px;background:#181818;color:#fff;font-size:22px;font-weight:950;box-shadow:0 10px 35px #0007;opacity:0;animation:settlePop 2.5s ease forwards;text-align:center}.coinSettlement.win{box-shadow:0 0 28px #ffd54f,0 10px 35px #0007}.coinSettlement.lose{box-shadow:0 0 22px #ff6b6b,0 10px 35px #0007}
 @keyframes settlePop{15%{opacity:1;transform:translateX(-50%) scale(1.08)}75%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.95)}}
 
-/* v13.7.5 SPECTATE - based on v13.7.2
+/* v13.7.6 FRIEND SPECTATE - based on v13.7.2
 /* v13.7.2 iOS Safari native-click fix */
 button,[role="button"],select,input{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,.10)}
 button{-webkit-appearance:none;appearance:none;cursor:pointer}
@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.5 SPECTATE</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.6 FRIEND SPECTATE</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -291,8 +291,11 @@ function show(id){document.body.classList.toggle('in-game',id==='game');['lobby'
 function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0).toString(36).toUpperCase().padStart(7,'0').slice(0,7)}
 async function setPresence(){
   presenceRef=ref(db,'presence/'+myId);
-  await set(presenceRef,{online:true,name:nick(),at:Date.now()});
-  onDisconnect(presenceRef).set({online:false,name:nick(),at:Date.now()});
+  await set(presenceRef,{online:true,name:nick(),at:Date.now(),room:(!aiMode&&roomId)?roomId:null});
+  onDisconnect(presenceRef).set({online:false,name:nick(),at:Date.now(),room:null});
+}
+async function publishPlayingRoom(code){
+ try{await update(ref(db,'presence/'+myId),{online:true,name:nick(),at:Date.now(),room:code||null})}catch(e){console.error(e)}
 }
 async function initSocial(){
   const fc=window.__omokFriendCode||friendCodeFor(myId);
@@ -325,11 +328,15 @@ async function initSocial(){
       const avatar=p.photo?`<img src="${p.photo}" alt="">`:(p.avatar||'🙂');
       const isPending=ch&&ch.status==='pending';
       div.innerHTML=`<div class="friendInfo"><div class="friendAvatar">${avatar}</div>
-      <div class="friendMain"><div class="friendTop"><div class="friendName">${safeName}</div><span class="badge ${pres.online?'onlineDot':'offlineDot'}">${pres.online?'● 온라인':'● 오프라인'}</span></div>
+      <div class="friendMain"><div class="friendTop"><div class="friendName">${safeName}</div><span class="badge ${pres.online?(pres.room?'playingDot':'onlineDot'):'offlineDot'}">${pres.online?(pres.room?'● 게임중':'● 온라인'):'● 오프라인'}</span></div>
       <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins??1000).toLocaleString()}</div></div></div>
-      <div class="friendActions"><button type="button" class="challengeBtn ${isPending?'pending':''}" ${(!pres.online&&!isPending)?'disabled':''}>${isPending?'신청 취소':'⚔️ 대결 신청'}</button><button type="button" class="friendDelete secondary" aria-label="친구 삭제">⋯</button></div>`;
+      <div class="friendActions"><button type="button" class="challengeBtn ${isPending?'pending':''}" ${(!pres.online||pres.room)&&!isPending?'disabled':''}>${pres.room?'🎮 게임 중':(isPending?'신청 취소':'⚔️ 대결 신청')}</button><button type="button" class="friendMore secondary" aria-label="친구 메뉴">⋯</button></div>
+      <div class="friendMoreMenu hidden"><button type="button" class="friendWatch secondary" ${pres.room?'':'disabled'}>👁️ 관전하기</button><button type="button" class="friendDelete danger">친구 삭제</button></div>`;
       const challenge=div.querySelector('.challengeBtn');
-      challenge.addEventListener('click',()=>isPending?cancelChallenge(id,safeName):openFriendBet(id,safeName,p.coins??1000));
+      challenge.addEventListener('click',()=>{if(pres.room)return;isPending?cancelChallenge(id,safeName):openFriendBet(id,safeName,p.coins??1000)});
+      const more=div.querySelector('.friendMore'),menu=div.querySelector('.friendMoreMenu');
+      more.addEventListener('click',()=>menu.classList.toggle('hidden'));
+      div.querySelector('.friendWatch').addEventListener('click',()=>{if(pres.room)watchRoom(pres.room)});
       div.querySelector('.friendDelete').addEventListener('click',()=>removeFriend(id,safeName));
       list.appendChild(div);
     }
@@ -860,10 +867,10 @@ async function purgeMyOldRooms(){
   await Promise.all(jobs);
 }
 async function createRoom(){await ensureProfile();await purgeMyOldRooms();let c;for(let i=0;i<8;i++){c=code();if(!(await get(ref(db,'rooms/'+c))).exists())break}roomId=c;myColor=0;sessionStorage.setItem('omokActiveRoom',c);await set(ref(db,'rooms/'+c),{createdAt:Date.now(),status:'waiting',turn:1,winner:0,board:Array(N*N).fill(0),moves:[],host:{id:myId,name:nick()},black:null,white:null,requests:{undo:null,rematch:null},resultRecorded:false,gameId:Date.now()});$('#roomCode').textContent=c;show('waiting');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
-async function joinRoom(c){await ensureProfile();c=(c||'').replace(/\D/g,'').slice(0,6);if(c.length!==6){msg('homeMsg','6자리 방 코드를 입력하세요.');return}const rr=ref(db,'rooms/'+c),snap=await get(rr);if(!snap.exists()){msg('homeMsg','존재하지 않는 방입니다.');return}const v=snap.val();if(v.status==='waiting'&&v.host?.id===myId){roomId=c;myColor=0;show('waiting');listen(c);return}if(v.status!=='waiting'){if(v.black?.id===myId||v.white?.id===myId){roomId=c;myColor=v.black?.id===myId?1:2;show('game');listen(c);return}msg('homeMsg','이미 두 명이 들어간 방입니다.');return}
+async function joinRoom(c){await ensureProfile();c=(c||'').replace(/\D/g,'').slice(0,6);if(c.length!==6){msg('homeMsg','6자리 방 코드를 입력하세요.');return}const rr=ref(db,'rooms/'+c),snap=await get(rr);if(!snap.exists()){msg('homeMsg','존재하지 않는 방입니다.');return}const v=snap.val();if(v.status==='waiting'&&v.host?.id===myId){roomId=c;myColor=0;show('waiting');listen(c);return}if(v.status!=='waiting'){if(v.black?.id===myId||v.white?.id===myId){roomId=c;myColor=v.black?.id===myId?1:2;await publishPlayingRoom(c);show('game');listen(c);return}msg('homeMsg','이미 두 명이 들어간 방입니다.');return}
  const host=v.host||v.black,guest={id:myId,name:nick()},hostBlack=Math.random()<.5,black=hostBlack?host:guest,white=hostBlack?guest:host;
- roomId=c;myColor=hostBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);await update(rr,{black,white,host:null,status:'playing',turn:1});show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
-function listen(c){if(unsub)unsub();unsub=onValue(ref(db,'rooms/'+c),async s=>{if(!s.exists()){msg('homeMsg','방이 종료되었습니다.');leaveLocal();return}state=s.val();if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}if(state.black&&state.white){if(!myColor)myColor=state.black.id===myId?1:2;show('game');render();await maybeRecordResult()}})}
+ roomId=c;myColor=hostBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);await update(rr,{black,white,host:null,status:'playing',turn:1});await publishPlayingRoom(c);show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
+function listen(c){if(unsub)unsub();unsub=onValue(ref(db,'rooms/'+c),async s=>{if(!s.exists()){msg('homeMsg','방이 종료되었습니다.');leaveLocal();return}state=s.val();if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}if(state.black&&state.white){if(!myColor)myColor=state.black.id===myId?1:2;if(!spectatorMode&&!aiMode)publishPlayingRoom(c);show('game');render();await maybeRecordResult()}})}
 async function watchRoom(code){
  code=String(code||'').trim();
  if(!/^\d{6}$/.test(code)){msg('homeMsg','6자리 방 코드를 입력하세요.');return}
@@ -924,7 +931,7 @@ async function settleRoomBet(){
 async function maybeRecordResult(){if(state.status!=='finished'||state.resultRecorded)return;const claim=await runTransaction(ref(db,'rooms/'+roomId+'/resultRecorded'),v=>v?undefined:myId);if(!claim.committed||claim.snapshot.val()!==myId)return;const ids=[state.black?.id,state.white?.id].filter(Boolean);for(const id of ids){const color=id===state.black.id?1:2;await applyResultStats(id,state.winner===color,color,(state.moves||[]).length,state.winner===0)}await settleRoomBet();await update(ref(db,'rooms/'+roomId),{betSettled:true})}
 $('#undo').addEventListener('click',async()=>{if(aiMode){if(!state?.moves?.length)return;let m=state.moves.slice(),b=arr(),aiColor=myColor===1?2:1;let last=m.pop();if(last)b[last.y*N+last.x]=0;if(last?.color===aiColor&&m.length){let prev=m.pop();b[prev.y*N+prev.x]=0}state.moves=m;state.board=b;state.turn=myColor;state.status='playing';state.winner=0;pending=null;render();return}if(state?.status!=='playing'||!moves().length)return;await set(ref(db,'rooms/'+roomId+'/requests/undo'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 무르기 수락을 기다리고 있습니다.')});$('#rematch').addEventListener('click',async()=>{if(state?.status!=='finished')return;if(aiMode){startAi();return}await set(ref(db,'rooms/'+roomId+'/requests/rematch'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 재대결 수락을 기다리고 있습니다.')});
 $('#acceptReq').addEventListener('click',async()=>{const type=$('#requestBox').dataset.type;if(type==='undo'){await runTransaction(ref(db,'rooms/'+roomId),room=>{if(!room?.requests?.undo)return;let m=Array.isArray(room.moves)?room.moves.filter(Boolean):[];const last=m.pop();if(!last){room.requests.undo=null;return room}let b=Array.isArray(room.board)?room.board.slice():Array.from({length:N*N},(_,i)=>Number(room.board?.[i]||0));b[last.y*N+last.x]=0;room.board=b;room.moves=m;room.turn=last.color;room.requests.undo=null;return room})}else if(type==='rematch'){const a=state.black,b=state.white,swap=Math.random()<.5;const black=swap?b:a,white=swap?a:b;await update(ref(db,'rooms/'+roomId),{black,white,board:Array(N*N).fill(0),moves:[],turn:1,winner:0,status:'playing',requests:{undo:null,rematch:null},resultRecorded:false,gameId:Date.now()});myColor=black.id===myId?1:2;pending=null;msg('gameMsg','재대결! 흑/백을 다시 랜덤으로 정했습니다.')}});$('#rejectReq').addEventListener('click',async()=>{const type=$('#requestBox').dataset.type;await set(ref(db,'rooms/'+roomId+'/requests/'+type),null);msg('gameMsg',type==='undo'?'무르기 요청을 거절했습니다.':'재대결 요청을 거절했습니다.')});
-$('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='playing'){state.status='finished';state.winner=2;await recordAiResult(false);render()}return}if(state?.status==='playing')await update(ref(db,'rooms/'+roomId),{status:'finished',winner:otherColor(),resultRecorded:false})});$('#create').addEventListener('click',createRoom);$('#joinBtn').addEventListener('click',()=>$('#joinBox').classList.toggle('hidden'));$('#join').addEventListener('click',()=>joinRoom($('#codeInput').value));$('#cancel').addEventListener('click',async()=>{if(roomId)await remove(ref(db,'rooms/'+roomId));leaveLocal()});$('#copy').addEventListener('click',async()=>{const u=location.origin+location.pathname+'?room='+roomId;try{await navigator.clipboard.writeText(u);msg('waitMsg','초대 링크를 복사했습니다.')}catch{msg('waitMsg','방 코드 '+roomId+' 를 친구에게 보내세요.')}});$('#leave').addEventListener('click',()=>leaveLocal());function leaveLocal(){spectatorMode=false;aiMode=false;aiThinking=false;$('#aiModeNote')?.classList.add('hidden');if(unsub){unsub();unsub=null}sessionStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');roomId=null;state=null;myColor=0;pending=null;currentChallenge=null;$('#challengeModal').classList.add('hidden');history.replaceState(null,'',location.pathname);show('lobby');ensureProfile()}
+$('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='playing'){state.status='finished';state.winner=2;await recordAiResult(false);render()}return}if(state?.status==='playing')await update(ref(db,'rooms/'+roomId),{status:'finished',winner:otherColor(),resultRecorded:false})});$('#create').addEventListener('click',createRoom);$('#joinBtn').addEventListener('click',()=>$('#joinBox').classList.toggle('hidden'));$('#join').addEventListener('click',()=>joinRoom($('#codeInput').value));$('#cancel').addEventListener('click',async()=>{if(roomId)await remove(ref(db,'rooms/'+roomId));leaveLocal()});$('#copy').addEventListener('click',async()=>{const u=location.origin+location.pathname+'?room='+roomId;try{await navigator.clipboard.writeText(u);msg('waitMsg','초대 링크를 복사했습니다.')}catch{msg('waitMsg','방 코드 '+roomId+' 를 친구에게 보내세요.')}});$('#leave').addEventListener('click',()=>leaveLocal());function leaveLocal(){if(!spectatorMode)publishPlayingRoom(null);spectatorMode=false;aiMode=false;aiThinking=false;$('#aiModeNote')?.classList.add('hidden');if(unsub){unsub();unsub=null}sessionStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');roomId=null;state=null;myColor=0;pending=null;currentChallenge=null;$('#challengeModal').classList.add('hidden');history.replaceState(null,'',location.pathname);show('lobby');ensureProfile()}
 
 $('#addFriend').addEventListener('click',addFriendByCode);
 $('#copyFriendCode').addEventListener('click',async()=>{const c=$('#myFriendCode').textContent;if(!c||c.includes('불러'))return;try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(c);else throw 0;msg('friendMsg','친구 코드를 복사했습니다.')}catch{msg('friendMsg','친구 코드: '+c+' · 길게 눌러 복사하세요.')}});
