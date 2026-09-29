@@ -142,7 +142,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 .friendActions button{position:relative;z-index:2}
 
 
-/* v13.8.2 friend challenge target + free-match hotfix */
+/* v13.8.3 friend + chat/performance fix */
 /* v13.8 account import + last move + chat */
 .importBox,.chatBox{margin-top:12px;padding:12px;border:1px solid #ddd5c8;border-radius:15px;background:#faf9f6}
 .chatLog{height:170px;overflow-y:auto;overscroll-behavior:contain;background:#fff;border:1px solid #e2ddd5;border-radius:12px;padding:9px;display:flex;flex-direction:column;gap:7px}
@@ -170,7 +170,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8 ACCOUNT + CHAT</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.3 FRIEND + CHAT FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -338,7 +338,7 @@ async function initSocial(){
       const isPending=ch&&ch.status==='pending';
       div.innerHTML=`<div class="friendInfo"><div class="friendAvatar">${avatar}</div>
       <div class="friendMain"><div class="friendTop"><div class="friendName">${safeName}</div><span class="badge ${pres.online?'onlineDot':'offlineDot'}">${pres.online?'● 온라인':'● 오프라인'}</span></div>
-      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins||0).toLocaleString()}</div></div></div>
+      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins??1000).toLocaleString()}</div></div></div>
       <div class="friendActions"><button type="button" class="challengeBtn ${isPending?'pending':''}" data-friend-id="${id}" data-friend-name="${safeName}" data-friend-coins="${Number(p.coins??1000)}" data-pending="${isPending?'1':'0'}" ${(!pres.online&&!isPending)?'disabled':''}>${isPending?'신청 취소':'⚔️ 대결 신청'}</button><button type="button" class="friendDelete secondary" data-friend-id="${id}" data-friend-name="${safeName}" aria-label="친구 삭제">⋯</button></div>`;
       list.appendChild(div);
     }
@@ -361,7 +361,7 @@ $('#friendList').addEventListener('click',e=>{
    e.preventDefault();
    const id=ch.dataset.friendId,name=ch.dataset.friendName||'친구';
    if(ch.dataset.pending==='1') cancelChallenge(id,name);
-   else openFriendBet(id,name,Number(ch.dataset.friendCoins||0));
+   else openFriendBet(id,name,Number(ch.dataset.friendCoins??1000));
    return;
  }
  const del=e.target.closest('.friendDelete');
@@ -924,9 +924,29 @@ async function sendChat(){
 $('#sendChat').addEventListener('click',sendChat);
 $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}});
 
-function listen(c){if(unsub)unsub();unsub=onValue(ref(db,'rooms/'+c),async s=>{if(!s.exists()){msg('homeMsg','방이 종료되었습니다.');leaveLocal();return}state=s.val();if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}if(state.black&&state.white){if(!myColor)myColor=state.black.id===myId?1:2;show('game');listenChat(c);render();await maybeRecordResult()}})}
+function listen(c){
+ if(unsub)unsub();
+ if(!aiMode)listenChat(c);else stopChat();
+ unsub=onValue(ref(db,'rooms/'+c),async s=>{
+  if(!s.exists()){msg('homeMsg','방이 종료되었습니다.');leaveLocal();return}
+  state=s.val();
+  if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}
+  if(state.black&&state.white){
+   if(!myColor)myColor=state.black.id===myId?1:2;
+   show('game');render();await maybeRecordResult();
+  }
+ })
+}
 function arr(){let b=state?.board||[];if(Array.isArray(b))return Array.from({length:N*N},(_,i)=>Number(b[i]||0));let a=Array(N*N).fill(0);Object.keys(b).forEach(k=>a[+k]=Number(b[k]||0));return a}function moves(){let m=state?.moves||[];if(Array.isArray(m))return m.filter(Boolean);return Object.keys(m).sort((a,b)=>+a-+b).map(k=>m[k])}
-async function fetchStats(id,el){if(!id){$(el).textContent='-';return}const p=(await get(ref(db,'users/'+id))).val()||{};$(el).textContent=`${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · ${p.games||0}전`}
+const statsCache=new Map();
+async function fetchStats(id,el){
+ if(!id){$(el).textContent='-';return}
+ const now=Date.now(),cached=statsCache.get(id);
+ if(cached&&now-cached.at<15000){$(el).textContent=cached.text;return}
+ const p=(await get(ref(db,'users/'+id))).val()||{};
+ const text=`${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · ${p.games||0}전`;
+ statsCache.set(id,{at:now,text});$(el).textContent=text;
+}
 function render(){const b=arr();$('#blackName').textContent=state.black?.name||'연결 끊김';$('#whiteName').textContent=state.white?.name||'연결 끊김';fetchStats(state.black?.id,'#blackStats');fetchStats(state.white?.id,'#whiteStats');$('#blackCard').classList.toggle('active',state.status==='playing'&&state.turn===1);$('#whiteCard').classList.toggle('active',state.status==='playing'&&state.turn===2);let opponent=aiMode?'AI':'친구';let st=state.status==='finished'?(state.winner===0?'무승부':state.winner===myColor?'내가 이겼습니다!':opponent+'가 이겼습니다'):(state.turn===myColor?'내 차례 · 위치를 선택하세요':opponent+' 차례');$('#status').textContent=st;renderRequest();renderResult();if(state.status!=='playing'||state.turn!==myColor){pending=null}updatePickUI();draw(b)}
 function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){box.classList.add('hidden');return}
  if(!aiMode&&Number(state.bet||0)>0){const k=`omokBetShown_${roomId}_${state.gameId}`;let seen=false;try{seen=sessionStorage.getItem(k)==='1'}catch(e){}if(!seen){try{sessionStorage.setItem(k,'1')}catch(e){}const bet=Number(state.bet);if(state.winner===0)showCoinSettlement(0,'🤝 베팅금 반환','');else if(state.winner===myColor)showCoinSettlement(bet,'🎉 코인전 승리','win');else showCoinSettlement(-bet,'💸 코인전 패배','lose')}}
