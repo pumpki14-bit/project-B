@@ -142,7 +142,8 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 .friendActions button{position:relative;z-index:2}
 
 
-/* v13.8.4 mobile lag: single pointer path + lazy BGM + reduced mobile effects */
+/* v13.8.5 realtime fix: no root challenge listener, chat-only updates skip board render, chat capped */
+ /* v13.8.4 mobile lag: single pointer path + lazy BGM + reduced mobile effects */
 /* v13.8.3 friend + chat/performance fix */
 /* v13.8 account import + last move + chat */
 .importBox,.chatBox{margin-top:12px;padding:12px;border:1px solid #ddd5c8;border-radius:15px;background:#faf9f6}
@@ -179,7 +180,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.4 MOBILE LAG FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.5 REALTIME FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -438,27 +439,29 @@ async function acceptChallenge(){
   setTimeout(()=>remove(ref(db,`challenges/${myId}/${ch.key}`)),2500);
 }
 async function rejectChallenge(){if(!currentChallenge)return;await update(ref(db,`challenges/${myId}/${currentChallenge.key}`),{status:'rejected'});$('#challengeModal').classList.add('hidden')}
+let outgoingChallengeUnsubs=[];
 function listenOutgoingChallenges(){
-  onValue(ref(db,'challenges'),snap=>{
+ outgoingChallengeUnsubs.forEach(fn=>{try{fn()}catch(e){}});
+ outgoingChallengeUnsubs=[];
+ get(ref(db,'friends/'+myId)).then(s=>{
+  Object.keys(s.val()||{}).forEach(target=>{
+   const challengeRef=ref(db,`challenges/${target}/${myId}`);
+   const off=onValue(challengeRef,snap=>{
     if(roomId)return;
-    const all=snap.val()||{};
-    for(const [target,items] of Object.entries(all)){
-      const v=items?.[myId];
-      if(!v)continue;
-      if(v.status==='accepted'&&v.room){if(pendingChallengeTarget&&target!==pendingChallengeTarget)continue;
-        const targetId=target, challengeRef=ref(db,`challenges/${targetId}/${myId}`);
-        roomId=v.room;const rs=all;sessionStorage.setItem('omokActiveRoom',roomId);
-        get(ref(db,'rooms/'+roomId)).then(s=>{const rr=s.val();myColor=rr?.black?.id===myId?1:2;show('game');listen(roomId)});
-        history.replaceState(null,'',location.pathname+'?room='+roomId);
-        pendingChallengeTarget=null;remove(challengeRef);
-        break;
-      }
-      if(v.status==='rejected'){
-        msg('friendMsg','상대가 대결 신청을 거절했습니다.');pendingChallengeTarget=null;
-        remove(ref(db,`challenges/${target}/${myId}`));
-      }
+    const v=snap.val();if(!v)return;
+    if(v.status==='accepted'&&v.room){
+     if(pendingChallengeTarget&&target!==pendingChallengeTarget)return;
+     roomId=v.room;sessionStorage.setItem('omokActiveRoom',roomId);
+     get(ref(db,'rooms/'+roomId)).then(rs=>{const rr=rs.val();myColor=rr?.black?.id===myId?1:2;show('game');listen(roomId)});
+     history.replaceState(null,'',location.pathname+'?room='+roomId);
+     pendingChallengeTarget=null;remove(challengeRef);
+    }else if(v.status==='rejected'){
+     msg('friendMsg','상대가 대결 신청을 거절했습니다.');pendingChallengeTarget=null;remove(challengeRef);
     }
-  })
+   });
+   outgoingChallengeUnsubs.push(off);
+  });
+ }).catch(console.error);
 }
 
 async function importOldAccount(){
@@ -928,13 +931,23 @@ async function sendChat(){
  if(aiMode||!roomId)return;
  const input=$('#chatInput'),text=(input.value||'').trim().slice(0,80);if(!text)return;
  input.value='';
- try{await push(ref(db,`rooms/${roomId}/chat`),{from:myId,name:nick(),text,at:Date.now()})}catch(e){msg('gameMsg','채팅 전송에 실패했습니다.')}
+ try{
+  await push(ref(db,`rooms/${roomId}/chat`),{from:myId,name:nick(),text,at:Date.now()});
+  const cs=await get(ref(db,`rooms/${roomId}/chat`)),entries=Object.entries(cs.val()||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+  if(entries.length>60){const cleanup={};entries.slice(0,entries.length-60).forEach(([k])=>cleanup[k]=null);await update(ref(db,`rooms/${roomId}/chat`),cleanup)}
+ }catch(e){console.error(e);msg('gameMsg','채팅 전송에 실패했습니다.')}
 }
 $('#sendChat').addEventListener('click',sendChat);
 $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}});
 
+let lastRoomRenderSig='';
+function roomRenderSignature(v){
+ const b=Array.isArray(v?.board)?v.board:Object.values(v?.board||{});
+ const m=Array.isArray(v?.moves)?v.moves:Object.values(v?.moves||{});
+ return JSON.stringify([v?.status,v?.turn,v?.winner,v?.gameId,v?.black?.id,v?.white?.id,v?.requests?.undo?.at||0,v?.requests?.rematch?.at||0,b,m]);
+}
 function listen(c){
- if(unsub)unsub();
+ if(unsub)unsub();lastRoomRenderSig='';
  if(!aiMode)listenChat(c);else stopChat();
  unsub=onValue(ref(db,'rooms/'+c),async s=>{
   if(!s.exists()){msg('homeMsg','방이 종료되었습니다.');leaveLocal();return}
@@ -942,7 +955,11 @@ function listen(c){
   if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}
   if(state.black&&state.white){
    if(!myColor)myColor=state.black.id===myId?1:2;
-   show('game');render();await maybeRecordResult();
+   show('game');
+   const sig=roomRenderSignature(state);
+   if(sig===lastRoomRenderSig)return;
+   lastRoomRenderSig=sig;
+   render();await maybeRecordResult();
   }
  })
 }
