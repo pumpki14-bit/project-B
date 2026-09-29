@@ -131,6 +131,7 @@ background-size:350% 100%;animation:titleFlow 8s linear infinite}
 .coinSettlement{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.8);z-index:9000;padding:16px 22px;border-radius:18px;background:#181818;color:#fff;font-size:22px;font-weight:950;box-shadow:0 10px 35px #0007;opacity:0;animation:settlePop 2.5s ease forwards;text-align:center}.coinSettlement.win{box-shadow:0 0 28px #ffd54f,0 10px 35px #0007}.coinSettlement.lose{box-shadow:0 0 22px #ff6b6b,0 10px 35px #0007}
 @keyframes settlePop{15%{opacity:1;transform:translateX(-50%) scale(1.08)}75%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.95)}}
 
+/* v13.7.3 FREE MATCH FIX - based on v13.7.2
 /* v13.7.2 iOS Safari native-click fix */
 button,[role="button"],select,input{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,.10)}
 button{-webkit-appearance:none;appearance:none;cursor:pointer}
@@ -162,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.2 iOS NATIVE CLICK</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.3 FREE MATCH FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -324,10 +325,10 @@ async function initSocial(){
       const isPending=ch&&ch.status==='pending';
       div.innerHTML=`<div class="friendInfo"><div class="friendAvatar">${avatar}</div>
       <div class="friendMain"><div class="friendTop"><div class="friendName">${safeName}</div><span class="badge ${pres.online?'onlineDot':'offlineDot'}">${pres.online?'● 온라인':'● 오프라인'}</span></div>
-      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins||0).toLocaleString()}</div></div></div>
+      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins??1000).toLocaleString()}</div></div></div>
       <div class="friendActions"><button type="button" class="challengeBtn ${isPending?'pending':''}" ${(!pres.online&&!isPending)?'disabled':''}>${isPending?'신청 취소':'⚔️ 대결 신청'}</button><button type="button" class="friendDelete secondary" aria-label="친구 삭제">⋯</button></div>`;
       const challenge=div.querySelector('.challengeBtn');
-      challenge.addEventListener('click',()=>isPending?cancelChallenge(id,safeName):openFriendBet(id,safeName,p.coins||0));
+      challenge.addEventListener('click',()=>isPending?cancelChallenge(id,safeName):openFriendBet(id,safeName,p.coins??1000));
       div.querySelector('.friendDelete').addEventListener('click',()=>removeFriend(id,safeName));
       list.appendChild(div);
     }
@@ -350,7 +351,7 @@ $('#friendList').addEventListener('click',e=>{
    e.preventDefault();
    const id=ch.dataset.friendId,name=ch.dataset.friendName||'친구';
    if(ch.dataset.pending==='1') cancelChallenge(id,name);
-   else openFriendBet(id,name,Number(ch.dataset.friendCoins||0));
+   else openFriendBet(id,name,Number(ch.dataset.friendCoins??1000));
    return;
  }
  const del=e.target.closest('.friendDelete');
@@ -379,9 +380,11 @@ function openFriendBet(id,name,friendCoins){
 async function sendChallenge(id,name,bet=0){
  try{
   const online=(await get(ref(db,'presence/'+id))).val()?.online;if(!online){msg('friendMsg','현재 오프라인인 친구입니다.');return}
-  const [meSnap,themSnap]=await Promise.all([get(ref(db,'users/'+myId+'/coins')),get(ref(db,'users/'+id+'/coins'))]);
-  const mine=Number(meSnap.val()??1000),theirs=Number(themSnap.val()??1000);
-  if(bet>0&&(mine<bet||theirs<bet)){msg('friendMsg','둘 중 한 명의 코인이 부족합니다.');return}
+  if(bet>0){
+   const [meSnap,themSnap]=await Promise.all([get(ref(db,'users/'+myId+'/coins')),get(ref(db,'users/'+id+'/coins'))]);
+   const mine=Number(meSnap.val()??1000),theirs=Number(themSnap.val()??1000);
+   if(mine<bet||theirs<bet){msg('friendMsg','둘 중 한 명의 코인이 부족합니다.');return}
+  }
   pendingChallengeTarget=id;
   await set(ref(db,`challenges/${id}/${myId}`),{from:myId,fromName:nick(),to:id,status:'pending',bet:Number(bet)||0,at:Date.now()});
   msg('friendMsg',`${name}님에게 ${bet?`🪙${bet.toLocaleString()} 코인전`:'무료 대전'}을 신청했습니다.`);
