@@ -131,7 +131,7 @@ background-size:350% 100%;animation:titleFlow 8s linear infinite}
 .coinSettlement{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.8);z-index:9000;padding:16px 22px;border-radius:18px;background:#181818;color:#fff;font-size:22px;font-weight:950;box-shadow:0 10px 35px #0007;opacity:0;animation:settlePop 2.5s ease forwards;text-align:center}.coinSettlement.win{box-shadow:0 0 28px #ffd54f,0 10px 35px #0007}.coinSettlement.lose{box-shadow:0 0 22px #ff6b6b,0 10px 35px #0007}
 @keyframes settlePop{15%{opacity:1;transform:translateX(-50%) scale(1.08)}75%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.95)}}
 
-/* v13.7.3 FREE MATCH FIX - based on v13.7.2
+/* v13.7.4 CHALLENGE FIX - based on v13.7.2
 /* v13.7.2 iOS Safari native-click fix */
 button,[role="button"],select,input{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,.10)}
 button{-webkit-appearance:none;appearance:none;cursor:pointer}
@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.3 FREE MATCH FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.4 CHALLENGE FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -343,20 +343,6 @@ async function initSocial(){
   },e=>console.error(e));
 }
 
-// Dynamic friend buttons: one native click listener on the stable parent.
-// This avoids iOS Safari losing listeners when Firebase rebuilds friend cards.
-$('#friendList').addEventListener('click',e=>{
- const ch=e.target.closest('.challengeBtn');
- if(ch){
-   e.preventDefault();
-   const id=ch.dataset.friendId,name=ch.dataset.friendName||'친구';
-   if(ch.dataset.pending==='1') cancelChallenge(id,name);
-   else openFriendBet(id,name,Number(ch.dataset.friendCoins??1000));
-   return;
- }
- const del=e.target.closest('.friendDelete');
- if(del){e.preventDefault();removeFriend(del.dataset.friendId,del.dataset.friendName||'친구')}
-});
 async function addFriendByCode(){
   const code=$('#friendCodeInput').value.trim().replace(/\s/g,'').toUpperCase();
   if(!code){msg('friendMsg','친구 코드를 입력하세요.');return}
@@ -373,8 +359,8 @@ async function addFriendByCode(){
 }
 function openFriendBet(id,name,friendCoins){
  pendingFriendBetTarget=id;pendingFriendBetName=name;
- $('#friendBetTarget').textContent=`${name}님과 대결 · 내 코인 ${(myProfile.coins??1000).toLocaleString()} · 상대 코인 ${Number(friendCoins||0).toLocaleString()}`;
- document.querySelectorAll('[data-fbet]').forEach(b=>{const v=Number(b.dataset.fbet);b.disabled=v>0&&((myProfile.coins??1000)<v||Number(friendCoins||0)<v)});
+ $('#friendBetTarget').textContent=`${name}님과 대결 · 내 코인 ${(myProfile.coins??1000).toLocaleString()} · 상대 코인 ${Number(friendCoins??1000).toLocaleString()}`;
+ document.querySelectorAll('[data-fbet]').forEach(b=>{const v=Number(b.dataset.fbet);b.disabled=v>0&&((myProfile.coins??1000)<v||Number(friendCoins??1000)<v)});
  $('#friendBetModal').classList.remove('hidden');
 }
 async function sendChallenge(id,name,bet=0){
