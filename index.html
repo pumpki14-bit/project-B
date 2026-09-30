@@ -131,7 +131,7 @@ background-size:350% 100%;animation:titleFlow 8s linear infinite}
 .coinSettlement{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.8);z-index:9000;padding:16px 22px;border-radius:18px;background:#181818;color:#fff;font-size:22px;font-weight:950;box-shadow:0 10px 35px #0007;opacity:0;animation:settlePop 2.5s ease forwards;text-align:center}.coinSettlement.win{box-shadow:0 0 28px #ffd54f,0 10px 35px #0007}.coinSettlement.lose{box-shadow:0 0 22px #ff6b6b,0 10px 35px #0007}
 @keyframes settlePop{15%{opacity:1;transform:translateX(-50%) scale(1.08)}75%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.95)}}
 
-/* v13.7.8 ADMIN + LIVE - based on v13.7.2
+/* v13.7.9 ADMIN FIX + AI - based on v13.7.2
 /* v13.7.2 iOS Safari native-click fix */
 button,[role="button"],select,input{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,.10)}
 button{-webkit-appearance:none;appearance:none;cursor:pointer}
@@ -303,8 +303,8 @@ async function adminLogin(){
  }catch(e){console.error(e);alert('관리자 로그인에 실패했습니다.')}
 }
 async function openAdmin(user){
- const ok=(await get(ref(db,'admins/'+user.uid))).val()===true;
- if(!ok){alert('로그인은 성공했습니다. 아직 관리자 등록이 필요합니다. Firebase Authentication → 사용자에서 UID를 확인한 뒤 Realtime Database의 admins/UID 값을 true로 등록하세요.');return}
+ let ok=false;try{ok=(await get(ref(db,'admins/'+user.uid))).val()===true}catch(e){console.error('admin check',e);alert('관리자 정보 읽기가 차단되어 있습니다. Realtime Database 규칙에 admins 읽기 권한을 추가해야 합니다.');return}
+ if(!ok){alert('Google 로그인은 됐지만 이 UID가 관리자 목록에 없습니다. admins/내UID = true인지 확인하세요.');return}
  show('adminPanel');$('#adminWho').textContent='관리자 로그인됨';
  const snap=await get(ref(db,'users')),rows=Object.entries(snap.val()||{});
  $('#adminUsers').innerHTML=rows.map(([id,p])=>`<div class="friendCard" data-admin-user="${id}"><div class="friendMain"><b>${String(p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">${p.wins||0}승 ${p.losses||0}패 · 🪙 ${(p.coins??1000).toLocaleString()}</div></div><button class="adminGive secondary" type="button">🎁 지급</button></div>`).join('');
@@ -314,7 +314,7 @@ getRedirectResult(auth).then(r=>{if(r?.user)openAdmin(r.user)}).catch(console.er
 function openRanking(){
  show('ranking');if(rankingUnsub)rankingUnsub();
  rankingUnsub=onValue(ref(db,'users'),snap=>{
-  const rows=Object.entries(snap.val()||{}).map(([id,p])=>{const w=+p.wins||0,l=+p.losses||0,d=+p.draws||0,g=+p.games||w+l+d,rate=w+l?w/(w+l):0;return {p,w,l,d,g,rate}}).sort((a,b)=>b.w-a.w||b.rate-a.rate||b.g-a.g).slice(0,50);
+  const rows=Object.entries(snap.val()||{}).map(([id,p])=>{const w=+p.wins||0,l=+p.losses||0,d=+p.draws||0,g=Math.max(+p.games||0,w+l+d),rate=w+l?w/(w+l):0;return {p,w,l,d,g,rate}}).filter(r=>r.g>0).sort((a,b)=>b.w-a.w||b.rate-a.rate||b.g-a.g).slice(0,50);
   $('#rankingList').innerHTML=rows.length?rows.map((r,i)=>`<div class="friendCard"><b style="min-width:34px">${i+1}위</b><div class="friendMain"><b>${String(r.p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">${r.w}승 ${r.l}패 ${r.d}무 · 승률 ${Math.round(r.rate*100)}%</div></div></div>`).join(''):'기록 없음';
  });
 }
@@ -579,7 +579,7 @@ const GACHA=[
 ];
 function rarityRoll(forceEpic=false){
  const x=Math.random()*100;
- if(x<1)return'chroma';if(x<5)return'legendary';if(forceEpic||x<17)return'epic';if(x<45)return'rare';return'common';
+ if(x<1.5)return'chroma';if(x<6)return'legendary';if(forceEpic||x<19)return'epic';if(x<48)return'rare';return'common';
 }
 function pickItem(forceEpic=false){
  const r=rarityRoll(forceEpic),pool=GACHA.filter(x=>x.r===r);return pool[Math.floor(Math.random()*pool.length)];
@@ -826,11 +826,11 @@ function aiMove(){
     best=moves.map(i=>[i,pointScore(root,i,aiColor)*1.25+pointScore(root,i,playerColor)+Math.random()*5000])
       .sort((a,b)=>b[1]-a[1])[0][0];
   }else if(best==null&&aiDifficulty==='hard'){
-    best=moves.map(i=>[i,forcingScore(root,i,aiColor,playerColor)])
+    best=moves.map(i=>[i,forcingScore(root,i,aiColor,playerColor)+pointScore(root,i,playerColor)*1.35])
       .sort((a,b)=>b[1]-a[1])[0][0];
   }else if(best==null){
     // Expert/Master/Impossible: tactical minimax over a pruned forcing-move tree.
-    const cfg=aiDifficulty==='expert'?{width:7,depth:2}:aiDifficulty==='master'?{width:8,depth:3}:{width:9,depth:3};
+    const cfg=aiDifficulty==='expert'?{width:8,depth:2}:aiDifficulty==='master'?{width:10,depth:3}:{width:11,depth:3};
     const order=(board,p,opp,width)=>{
       const c=nearby(board,2).filter(i=>legal(board,i,p));
       const wins=c.filter(i=>winAt(board,i,p));if(wins.length)return wins.slice(0,width);
