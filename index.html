@@ -184,7 +184,10 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.1 MILEAGE SHOP</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><div id="mileageTopBar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0 14px;padding:10px 12px;border:1px solid #ddd;border-radius:14px">
+      <div><div class="muted" style="font-size:12px">보유 마일리지</div><b id="mileageBalance" style="font-size:18px">🎟️ 0</b></div>
+      <button id="mileageShopBtn" type="button" class="secondary">🎟️ 마일리지 상점</button>
+    </div><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.2 MILEAGE STORE</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -269,7 +272,7 @@ onclick="document.body.classList.remove('in-game');document.getElementById('home
 
 <section id="ranking" class="card hidden"><h1>🏆 실시간 랭킹</h1><p class="muted">승수 기준 · 동률이면 승률, 경기 수 순</p><div id="rankingList">불러오는 중...</div><button id="rankingBack" type="button" class="secondary" style="width:100%;margin-top:12px">돌아가기</button></section>
 <section id="mileageShop" class="card hidden"><h1>🎟️ 마일리지 샵</h1>
-<p class="muted">중복 캡슐 보상으로 얻은 마일리지를 확정 보상으로 교환할 수 있어요.</p>
+<p class="muted">중복 캡슐 보상으로 얻은 마일리지를 원하는 보상으로 교환할 수 있어요. 모든 상품은 구매 횟수 제한이 없습니다.</p>
 <div id="mileageShopBalance" style="font-weight:900;margin:10px 0">보유 🎟️ 0</div>
 <div id="mileageShopList"></div>
 <button id="mileageShopBack" class="secondary" style="width:100%;margin-top:12px">캡슐로 돌아가기</button></section>
@@ -866,17 +869,22 @@ const EXTRA_TITLES=[
 GACHA.push(...EXTRA_TITLES);
 
 
+
+function showMileageGain(n){
+ if(Number(n)>0)setTimeout(()=>alert(`중복 보상! 🎟️ 마일리지 +${Number(n)}`),120);
+}
+
 const MILEAGE_BY_RARITY={common:1,rare:3,epic:5,legendary:10,chroma:30};
 async function addMileage(n){
  n=Math.max(0,Math.floor(Number(n||0)));if(!n)return;
  await runTransaction(ref(db,`users/${myId}/mileage`),v=>Number(v||0)+n);
 }
 async function spendMileage(cost){
- let ok=false;
- await runTransaction(ref(db,`users/${myId}/mileage`),v=>{
-   v=Number(v||0); if(v<cost)return v; ok=true; return v-cost;
+ cost=Math.max(1,Math.floor(Number(cost||0)));
+ const rr=await runTransaction(ref(db,`users/${myId}/mileage`),v=>{
+   v=Number(v||0); if(v<cost)return; return v-cost;
  });
- return ok;
+ return !!rr.committed;
 }
 
 function rarityRoll(forceEpic=false){
@@ -1342,6 +1350,18 @@ async function updateDailyMissions(uid,won){
  if(won)await runTransaction(ref(db,base+'/wins'),v=>Number(v||0)+1);
 }
 
+
+let mileageLiveUnsub=null;
+function startMileageLive(){
+ if(mileageLiveUnsub)mileageLiveUnsub();
+ mileageLiveUnsub=onValue(ref(db,`users/${myId}/mileage`),s=>{
+   const m=Number(s.val()||0);
+   if($('#mileageBalance'))$('#mileageBalance').textContent='🎟️ '+m.toLocaleString();
+   if($('#mileageShopBalance'))$('#mileageShopBalance').textContent='보유 🎟️ '+m.toLocaleString();
+ });
+}
+startMileageLive();
+
 const MILEAGE_SHOP=[
  {id:'coin500',name:'🪙 500 코인',cost:15,type:'coins',amount:500},
  {id:'coin2000',name:'🪙 2,000 코인',cost:50,type:'coins',amount:2000},
@@ -1358,7 +1378,7 @@ async function refreshMileage(){
 }
 async function openMileageShop(){
  show('mileageShop');await refreshMileage();
- $('#mileageShopList').innerHTML=MILEAGE_SHOP.map(x=>`<div class="friendCard"><div class="friendMain"><b>${x.name}</b><div class="muted">🎟️ ${x.cost}</div></div><button class="mileageBuy secondary" data-id="${x.id}">교환</button></div>`).join('');
+ $('#mileageShopList').innerHTML=MILEAGE_SHOP.map(x=>`<div class="friendCard"><div class="friendMain"><b>${x.name}</b><div class="muted">🎟️ ${x.cost}</div></div><button class="mileageBuy secondary" data-id="${x.id}">교환하기</button></div>`).join('');
  document.querySelectorAll('.mileageBuy').forEach(b=>b.onclick=async()=>{
    const x=MILEAGE_SHOP.find(z=>z.id===b.dataset.id);if(!x)return;
    if(!(await spendMileage(x.cost))){alert('마일리지가 부족합니다.');return}
