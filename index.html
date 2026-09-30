@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.1 ADMIN LOGIN DIAG</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.2 ADMIN PERSIST FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -287,7 +287,7 @@ var __g=document.getElementById('game');if(__g)__g.classList.add('hidden');
 </script>
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
-import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 import {getDatabase,ref,set,get,update,onValue,runTransaction,remove,onDisconnect,push} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js';
 const firebaseConfig={apiKey:'AIzaSyBaiY8zg-Gt6sUzCE66RKDJyNBATi-wS-k',authDomain:'omok-7642e.firebaseapp.com',databaseURL:'https://omok-7642e-default-rtdb.asia-southeast1.firebasedatabase.app/',projectId:'omok-7642e',storageBucket:'omok-7642e.firebasestorage.app',messagingSenderId:'469622813122',appId:'1:469622813122:web:43e75c885d3b475dfde65b'};
 const app=initializeApp(firebaseConfig),db=getDatabase(app),auth=getAuth(app),googleProvider=new GoogleAuthProvider(),$=s=>document.querySelector(s);document.getElementById('jsStatus').textContent='정상';document.addEventListener('touchstart',()=>{}, {passive:true});const N=15,P=30,S=(640-P*2)/(N-1),dirs=[[1,0],[0,1],[1,1],[1,-1]];
@@ -299,6 +299,7 @@ function show(id){document.body.classList.toggle('in-game',id==='game');['lobby'
 function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0).toString(36).toUpperCase().padStart(7,'0').slice(0,7)}
 
 let adminAuthChecked=false,adminPresenceUnsub=null;
+setPersistence(auth,browserLocalPersistence).catch(e=>console.error('auth persistence',e));
 
 async function isAdminUser(user){
  if(!user)return false;
@@ -312,20 +313,28 @@ async function isAdminUser(user){
 }
 async function adminLogin(){
  try{
+  await setPersistence(auth,browserLocalPersistence);
   if(auth.currentUser){
-   const ok=await isAdminUser(auth.currentUser);
-   if(ok){await openAdmin(auth.currentUser);return}
-   const registered=(await get(ref(db,'admins'))).val()||{};
-   const keys=Object.keys(registered);
-   alert('Google 로그인은 성공했습니다. 하지만 현재 로그인한 Google 계정의 UID가 admins에 등록된 UID와 다릅니다.\n\n현재 로그인 UID: '+auth.currentUser.uid+'\n등록된 관리자 수: '+keys.length+'명\n\nFirebase Authentication의 이 Google 계정 UID를 admins 아래에 true로 등록해 주세요.');
+   if(await isAdminUser(auth.currentUser)){await openAdmin(auth.currentUser);return}
+   alert('로그인은 되어 있지만 관리자 UID가 일치하지 않습니다.\n현재 로그인 UID: '+auth.currentUser.uid);
    return;
   }
-  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(mobile){sessionStorage.setItem('omokAdminLoginPending','1');await signInWithRedirect(auth,googleProvider);return}
-  const result=await signInWithPopup(auth,googleProvider);
-  if(result?.user){
-   if(await isAdminUser(result.user))await openAdmin(result.user);
-   else alert('Google 로그인은 성공했지만 이 계정은 관리자로 등록되어 있지 않습니다.');
+  try{
+   const result=await signInWithPopup(auth,googleProvider);
+   if(result?.user){
+    if(await isAdminUser(result.user)){
+     await openAdmin(result.user);
+     alert('🛡️ 관리자 인증 완료');
+    }else alert('Google 로그인은 성공했지만 관리자 UID가 일치하지 않습니다.\n현재 로그인 UID: '+result.user.uid);
+   }
+  }catch(e){
+   const c=String(e?.code||'');
+   if(c.includes('popup-blocked')||c.includes('operation-not-supported-in-this-environment')){
+    sessionStorage.setItem('omokAdminLoginPending','1');
+    await signInWithRedirect(auth,googleProvider);
+    return;
+   }
+   throw e;
   }
  }catch(e){
   console.error('admin login',e);
@@ -384,8 +393,8 @@ async function openAdmin(user){
 }
 getRedirectResult(auth).then(async r=>{
  if(r?.user){
-  if(await isAdminUser(r.user))await openAdmin(r.user);
-  else alert('로그인은 됐지만 관리자 계정이 아닙니다.');
+  if(await isAdminUser(r.user)){await openAdmin(r.user);alert('🛡️ 관리자 인증 완료');}
+  else alert('로그인은 됐지만 관리자 계정이 아닙니다.\n현재 로그인 UID: '+r.user.uid);
  }
 }).catch(e=>{console.error('redirect result',e);alert('로그인 복귀 처리 실패: '+(e?.code||e?.message||String(e)))});
 onAuthStateChanged(auth,async user=>{
