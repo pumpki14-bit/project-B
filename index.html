@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.9 ELO + ADMIN FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.0 SECURE ADMIN PANEL</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -247,7 +247,11 @@ onclick="document.body.classList.remove('in-game');document.getElementById('home
 <div id="challengeModal" class="modal hidden"><div class="modalCard"><h1 style="font-size:21px">⚔️ 대결 신청 도착!</h1><p id="challengeText"></p><div id="challengeBetInfo" class="betNotice"></div><div class="row"><button type="button" id="acceptChallenge">대결 수락</button><button type="button" id="rejectChallenge" class="secondary">거절</button></div></div></div>
 
 <section id="ranking" class="card hidden"><h1>🏆 실시간 랭킹</h1><p class="muted">승수 기준 · 동률이면 승률, 경기 수 순</p><div id="rankingList">불러오는 중...</div><button id="rankingBack" type="button" class="secondary" style="width:100%;margin-top:12px">돌아가기</button></section>
-<section id="adminPanel" class="card hidden"><h1>🛡️ 관리자 패널</h1><p id="adminWho" class="muted"></p><div id="adminUsers">사용자를 불러오는 중...</div><button id="adminBack" type="button" class="secondary" style="width:100%;margin-top:12px">돌아가기</button></section>
+<section id="adminPanel" class="card hidden"><h1>🛡️ 관리자 패널</h1>
+<p id="adminWho" class="muted"></p>
+<div id="adminStatus" class="notice">관리자 인증 확인 중...</div>
+<div id="adminUsers">사용자를 불러오는 중...</div>
+<button id="adminBack" type="button" class="secondary" style="width:100%;margin-top:12px">돌아가기</button></section>
 <section id="waiting" class="card hidden"><h1>친구 기다리는 중</h1><p class="muted">방 코드를 친구에게 보내세요.</p><div id="roomCode" class="code">------</div><button type="button" id="copy" style="width:100%">초대 링크 복사</button><p class="notice">친구가 링크로 접속하거나 방 코드를 입력하면 시작됩니다.</p><button type="button" id="cancel" class="secondary" style="width:100%">방 나가기</button><div id="waitMsg" class="toast"></div></section>
 <section id="game" class="hidden"><div class="card"><div class="players"><div id="blackCard" class="player"><b>⚫ 흑</b><div id="blackName">-</div><div id="blackStats" class="stats">전적 불러오는 중</div></div><div id="whiteCard" class="player"><b>⚪ 백</b><div id="whiteName">-</div><div id="whiteStats" class="stats">전적 불러오는 중</div></div></div><div id="spectatorCount" class="muted" style="text-align:center;margin:5px 0">👁️ 관전자 0명</div><div id="status" class="status">연결 중...</div>
 <div id="requestBox" class="request hidden"><b id="requestText"></b><div class="row"><button type="button" id="acceptReq">수락</button><button type="button" id="rejectReq" class="secondary">거절</button></div></div>
@@ -294,38 +298,105 @@ function show(id){document.body.classList.toggle('in-game',id==='game');['lobby'
 
 function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0).toString(36).toUpperCase().padStart(7,'0').slice(0,7)}
 
+let adminAuthChecked=false,adminPresenceUnsub=null;
+
+async function isAdminUser(user){
+ if(!user)return false;
+ try{
+  const v=(await get(ref(db,'admins/'+user.uid))).val();
+  return v===true||v==='true'||v===1;
+ }catch(e){
+  console.error('admin check',e);
+  return false;
+ }
+}
 async function adminLogin(){
  try{
-  if(auth.currentUser){await openAdmin(auth.currentUser);return}
+  if(auth.currentUser){
+   const ok=await isAdminUser(auth.currentUser);
+   if(ok){await openAdmin(auth.currentUser);return}
+  }
   const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(mobile){await signInWithRedirect(auth,googleProvider);return}
+  if(mobile){sessionStorage.setItem('omokAdminLoginPending','1');await signInWithRedirect(auth,googleProvider);return}
   const result=await signInWithPopup(auth,googleProvider);
-  if(result?.user)await openAdmin(result.user);
+  if(result?.user){
+   if(await isAdminUser(result.user))await openAdmin(result.user);
+   else alert('Google 로그인은 성공했지만 이 계정은 관리자로 등록되어 있지 않습니다.');
+  }
  }catch(e){
   console.error('admin login',e);
   alert('관리자 로그인 실패: '+(e?.code||e?.message||String(e)));
  }
 }
-async function openAdmin(user){
- let v=null;
- try{v=(await get(ref(db,'admins/'+user.uid))).val()}
- catch(e){console.error('admin check',e);alert('관리자 확인 실패: '+(e?.code||e?.message||String(e)));return}
- const ok=(v===true||v==='true'||v===1);
- if(!ok){alert('Google 로그인은 성공했습니다. 하지만 이 계정 UID가 admins에 등록되어 있지 않습니다.\n현재 로그인 UID: '+user.uid);return}
- show('adminPanel');
- $('#adminWho').textContent='🛡️ 관리자 · '+(user.email||user.uid);
- $('#adminLogin').textContent='🛡️ 관리자 패널';
- const snap=await get(ref(db,'users')),rows=Object.entries(snap.val()||{});
- $('#adminUsers').innerHTML=rows.map(([id,p])=>`<div class="friendCard" data-admin-user="${id}"><div class="friendMain"><b>${String(p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">레이팅 ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 · 🪙 ${(p.coins??1000).toLocaleString()}</div></div><button class="adminGive secondary" type="button">🎁 지급</button></div>`).join('');
- document.querySelectorAll('.adminGive').forEach(btn=>btn.addEventListener('click',async()=>{
-   const uid=btn.closest('[data-admin-user]').dataset.adminUser,item=prompt('지급할 아이템 이름을 입력하세요.');
-   if(!item)return;
-   await runTransaction(ref(db,`users/${uid}/inventory/${encodeURIComponent(item)}`),v=>Number(v||0)+1);
-   alert('1개 지급했습니다.');
- }))
+function escAdmin(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function adminItemOptions(){
+ return GACHA.map(x=>`<option value="${encodeURIComponent(x.n)}">${x.r.toUpperCase()} · ${escAdmin(x.n)}</option>`).join('');
 }
-getRedirectResult(auth).then(r=>{if(r?.user)openAdmin(r.user)}).catch(e=>console.error('redirect result',e));
-onAuthStateChanged(auth,user=>{if(user){$('#adminLogin').textContent='🛡️ 관리자 패널';}});
+async function renderAdminUsers(){
+ const [us,ps]=await Promise.all([get(ref(db,'users')),get(ref(db,'presence'))]);
+ const users=us.val()||{},presence=ps.val()||{};
+ const rows=Object.entries(users).sort((a,b)=>{
+  const ap=presence[a[0]]||{},bp=presence[b[0]]||{};
+  return Number(!!bp.room)-Number(!!ap.room)||Number(!!bp.online)-Number(!!ap.online)||Number(b[1].rating||1000)-Number(a[1].rating||1000);
+ });
+ $('#adminUsers').innerHTML=rows.length?rows.map(([id,p])=>{
+  const pr=presence[id]||{},playing=!!(pr.online&&pr.room),online=!!pr.online;
+  const status=playing?'🔴 게임 중':online?'🟢 온라인':'⚫ 오프라인';
+  const me=id===myId?' 👑 나':'';
+  return `<div class="friendCard" data-admin-user="${escAdmin(id)}" style="display:block">
+   <div class="friendMain"><b>${escAdmin(p.name||'플레이어')}${me}</b>
+   <div class="muted">${status} · ⭐ ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · 🪙 ${Number(p.coins??1000).toLocaleString()}</div></div>
+   <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+    ${playing?`<button class="adminWatch secondary" data-room="${escAdmin(pr.room)}" type="button">👁️ 관전</button>`:''}
+    <select class="adminItem" style="flex:1;min-width:160px">${adminItemOptions()}</select>
+    <button class="adminGive secondary" type="button">🎁 1개 지급</button>
+   </div></div>`;
+ }).join(''):'등록된 플레이어가 없습니다.';
+ document.querySelectorAll('.adminGive').forEach(btn=>btn.addEventListener('click',async()=>{
+   if(!(await isAdminUser(auth.currentUser))){alert('관리자 권한이 없습니다.');return}
+   const card=btn.closest('[data-admin-user]'),uid=card.dataset.adminUser,item=card.querySelector('.adminItem').value;
+   if(!item)return;
+   await runTransaction(ref(db,`users/${uid}/inventory/${item}`),v=>Number(v||0)+1);
+   alert('아이템 1개를 지급했습니다.');
+ }));
+ document.querySelectorAll('.adminWatch').forEach(btn=>btn.addEventListener('click',async()=>{
+   if(!(await isAdminUser(auth.currentUser))){alert('관리자 권한이 없습니다.');return}
+   await watchRoom(btn.dataset.room);
+ }));
+}
+async function openAdmin(user){
+ if(!(await isAdminUser(user))){
+  alert('Google 로그인은 성공했지만 관리자 UID가 일치하지 않습니다.\n로그인 UID: '+user.uid);
+  return;
+ }
+ adminAuthChecked=true;
+ $('#adminLogin').textContent='🛡️ 관리자 패널';
+ show('adminPanel');
+ $('#adminWho').textContent='🛡️ 관리자 인증됨 · '+(user.email||'Google 계정');
+ $('#adminStatus').textContent='✅ 관리자 권한 활성화 · 내 계정 포함 전체 플레이어 관리 가능';
+ await renderAdminUsers();
+ if(adminPresenceUnsub)adminPresenceUnsub();
+ adminPresenceUnsub=onValue(ref(db,'presence'),()=>{if(!$('#adminPanel').classList.contains('hidden'))renderAdminUsers().catch(console.error)});
+}
+getRedirectResult(auth).then(async r=>{
+ if(r?.user){
+  if(await isAdminUser(r.user))await openAdmin(r.user);
+  else alert('로그인은 됐지만 관리자 계정이 아닙니다.');
+ }
+}).catch(e=>{console.error('redirect result',e);alert('로그인 복귀 처리 실패: '+(e?.code||e?.message||String(e)))});
+onAuthStateChanged(auth,async user=>{
+ if(!user){adminAuthChecked=false;$('#adminLogin').textContent='🔐 관리자 로그인';return}
+ const ok=await isAdminUser(user);
+ adminAuthChecked=ok;
+ if(ok){
+  $('#adminLogin').textContent='🛡️ 관리자 패널';
+  // 리다이렉트 복귀 직후에는 관리자인지 눈에 확실히 보이게 패널을 연다.
+  if(location.hash==='#admin-login-return'||sessionStorage.getItem('omokAdminLoginPending')==='1'){
+   sessionStorage.removeItem('omokAdminLoginPending');
+   await openAdmin(user);
+  }
+ }
+});
 function openRanking(){
  show('ranking');if(rankingUnsub)rankingUnsub();
  rankingUnsub=onValue(ref(db,'users'),snap=>{
