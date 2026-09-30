@@ -223,7 +223,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.21 DRAW SCOPE + LOG CLEAR FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.22 REFRESH REJOIN + AI RESULT FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;min-width:58px;min-height:58px;flex:0 0 58px;aspect-ratio:1/1;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -408,7 +408,7 @@ let myId=null;try{myId=localStorage.getItem('omokPlayerId')}catch(e){}if(!myId){
 let savedNick=localStorage.getItem('omokNick')||'플레이어';$('#nick').value=savedNick;let roomId=null,myColor=0,state=null,aiMode=false,aiThinking=false,unsub=null,profileUnsub=null,pending=null,lastStatus=null,friendsUnsub=null,inboxUnsub=null,presenceRef=null,currentChallenge=null;let pendingChallengeTarget=null,pendingFriendBetTarget=null,pendingFriendBetName='';let rankingUnsub=null;
 let roomChatUnsub=null,globalChatUnsub=null;
 let opponentLeftHandled=false,spectatorRef=null;
-let aiDifficulty='normal';try{aiDifficulty=localStorage.getItem('omokAiDifficulty')||'normal'}catch(e){}sessionStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');
+let aiDifficulty='normal';try{aiDifficulty=localStorage.getItem('omokAiDifficulty')||'normal'}catch(e){}document.body.classList.remove('in-game');
 function show(id){document.body.classList.toggle('in-game',id==='game');['lobby','home','waiting','game','profileEditor','gachaScreen','ranking','mileageShop','history','missions','adminPanel'].forEach(x=>$('#'+x)?.classList.add('hidden'));$('#friendsPanel')?.classList.toggle('hidden',id!=='lobby'&&id!=='home');$('#globalChatPanel')?.classList.toggle('hidden',id!=='lobby');$('#'+id)?.classList.remove('hidden')}function nick(){let n=$('#nick').value.trim().slice(0,12)||'플레이어';localStorage.setItem('omokNick',n);return n}function msg(id,t){$('#'+id).textContent=t}function code(){return String(Math.floor(100000+Math.random()*900000))}function otherColor(){return myColor===1?2:1}function keyFor(c){return c===1?'black':'white'}
 
 function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0).toString(36).toUpperCase().padStart(7,'0').slice(0,7)}
@@ -894,7 +894,7 @@ async function acceptChallenge(){
   const room=freshRoom(challengerBlack?challenger:me,challengerBlack?me:challenger,'playing');room.bet=bet;room.pot=bet*2;room.betSettled=false;room.betEscrowed=bet>0;
   await set(ref(db,'rooms/'+c),room);
   await update(ref(db,`challenges/${myId}/${ch.key}`),{status:'accepted',room:c,acceptedAt:Date.now()});
-  roomId=c;myColor=challengerBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);$('#challengeModal').classList.add('hidden');show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c);
+  roomId=c;myColor=challengerBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);localStorage.setItem('omokActiveRoom',c);$('#challengeModal').classList.add('hidden');show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c);
   setTimeout(()=>remove(ref(db,`challenges/${myId}/${ch.key}`)),2500);
 }
 async function rejectChallenge(){if(!currentChallenge)return;await update(ref(db,`challenges/${myId}/${currentChallenge.key}`),{status:'rejected'});$('#challengeModal').classList.add('hidden')}
@@ -907,7 +907,7 @@ function listenOutgoingChallenges(){
       if(!v)continue;
       if(v.status==='accepted'&&v.room){if(pendingChallengeTarget&&target!==pendingChallengeTarget)continue;
         const targetId=target, challengeRef=ref(db,`challenges/${targetId}/${myId}`);
-        roomId=v.room;const rs=all;sessionStorage.setItem('omokActiveRoom',roomId);
+        roomId=v.room;const rs=all;sessionStorage.setItem('omokActiveRoom',roomId);localStorage.setItem('omokActiveRoom',roomId);
         get(ref(db,'rooms/'+roomId)).then(s=>{const rr=s.val();myColor=rr?.black?.id===myId?1:2;show('game');listen(roomId)});
         history.replaceState(null,'',location.pathname+'?room='+roomId);
         pendingChallengeTarget=null;remove(challengeRef);
@@ -1304,7 +1304,7 @@ function startAi(){
  state=freshRoom(myColor===1?me:bot,myColor===1?bot:me,'playing');
  const dn={easy:'쉬움',normal:'보통',hard:'어려움',expert:'전문가',master:'마스터',impossible:'IMPOSSIBLE'}[aiDifficulty]||'보통';
  $('#aiModeNote').textContent=`🤖 AI ${dn} · 흑/백은 매 판 랜덤 · 무르기는 즉시 적용됩니다.`;
- $('#aiModeNote').classList.remove('hidden');show('game');listenRoomChat(c);render();
+ $('#aiModeNote').classList.remove('hidden');show('game');render();
  msg('gameMsg',myColor===1?'랜덤 결과: 내가 흑입니다. 먼저 시작하세요.':'랜덤 결과: AI가 흑입니다. AI가 먼저 시작합니다.');
  if(myColor===2)aiMove();
 }
@@ -1462,10 +1462,10 @@ async function purgeMyOldRooms(){
   }
   await Promise.all(jobs);
 }
-async function createRoom(){await ensureProfile();await purgeMyOldRooms();const bet=Math.max(0,Math.floor(Number(selectedBet)||0));const myCoins=Number((await get(ref(db,`users/${myId}/coins`))).val()??1000);if(bet>myCoins){msg('homeMsg','보유 코인보다 많이 베팅할 수 없습니다.');return}let c;for(let i=0;i<8;i++){c=code();if(!(await get(ref(db,'rooms/'+c))).exists())break}roomId=c;myColor=0;sessionStorage.setItem('omokActiveRoom',c);await set(ref(db,'rooms/'+c),{createdAt:Date.now(),status:'waiting',turn:1,winner:0,board:Array(N*N).fill(0),moves:[],host:{id:myId,name:nick()},black:null,white:null,requests:{undo:null,draw:null,rematch:null},resultRecorded:false,gameId:Date.now(),bet,pot:bet*2,betSettled:false,betEscrowed:false});$('#roomCode').textContent=c;show('waiting');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
+async function createRoom(){await ensureProfile();await purgeMyOldRooms();const bet=Math.max(0,Math.floor(Number(selectedBet)||0));const myCoins=Number((await get(ref(db,`users/${myId}/coins`))).val()??1000);if(bet>myCoins){msg('homeMsg','보유 코인보다 많이 베팅할 수 없습니다.');return}let c;for(let i=0;i<8;i++){c=code();if(!(await get(ref(db,'rooms/'+c))).exists())break}roomId=c;myColor=0;sessionStorage.setItem('omokActiveRoom',c);localStorage.setItem('omokActiveRoom',c);await set(ref(db,'rooms/'+c),{createdAt:Date.now(),status:'waiting',turn:1,winner:0,board:Array(N*N).fill(0),moves:[],host:{id:myId,name:nick()},black:null,white:null,requests:{undo:null,draw:null,rematch:null},resultRecorded:false,gameId:Date.now(),bet,pot:bet*2,betSettled:false,betEscrowed:false});$('#roomCode').textContent=c;show('waiting');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
 async function joinRoom(c){await ensureProfile();c=(c||'').replace(/\D/g,'').slice(0,6);if(c.length!==6){msg('homeMsg','6자리 방 코드를 입력하세요.');return}const rr=ref(db,'rooms/'+c),snap=await get(rr);if(!snap.exists()){msg('homeMsg','존재하지 않는 방입니다.');return}const v=snap.val();if(v.status==='waiting'&&v.host?.id===myId){roomId=c;myColor=0;show('waiting');listen(c);return}if(v.status!=='waiting'){if(v.black?.id===myId||v.white?.id===myId){roomId=c;myColor=v.black?.id===myId?1:2;await publishPlayingRoom(c);show('game');listen(c);return}msg('homeMsg','이미 두 명이 들어간 방입니다.');return}
  const host=v.host||v.black,guest={id:myId,name:nick()},hostBlack=Math.random()<.5,black=hostBlack?host:guest,white=hostBlack?guest:host;
- roomId=c;myColor=hostBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);await update(rr,{black,white,host:null,status:'playing',turn:1});await publishPlayingRoom(c);show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
+ roomId=c;myColor=hostBlack?2:1;sessionStorage.setItem('omokActiveRoom',c);localStorage.setItem('omokActiveRoom',c);await update(rr,{black,white,host:null,status:'playing',turn:1});await publishPlayingRoom(c);show('game');listen(c);history.replaceState(null,'',location.pathname+'?room='+c)}
 
 function chatEscape(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function chatRows(v,limit=50){return Object.entries(v||{}).map(([key,x])=>({...x,key})).sort((a,b)=>Number(a.at||0)-Number(b.at||0)).slice(-limit)}
@@ -1546,7 +1546,10 @@ $('#status').textContent=st;
 ['place','clearPick','undo','rematch','resign'].forEach(id=>{const el=$('#'+id);if(el)el.disabled=spectatorMode});renderRequest();renderResult();if(state.status!=='playing'||state.turn!==myColor){pending=null}updatePickUI();draw(b)}
 function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){box.classList.add('hidden');return}
  if(!aiMode&&Number(state.bet||0)>0){const k=`omokBetShown_${roomId}_${state.gameId}`;let seen=false;try{seen=sessionStorage.getItem(k)==='1'}catch(e){}if(!seen){try{sessionStorage.setItem(k,'1')}catch(e){}const bet=Number(state.bet);if(state.winner===0)showCoinSettlement(0,'🤝 베팅금 반환','');else if(state.winner===myColor)showCoinSettlement(bet,'🎉 코인전 승리','win');else showCoinSettlement(-bet,'💸 코인전 패배','lose')}}
-box.classList.remove('hidden');box.classList.remove('win','lose','draw');if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent='팽팽한 대국이었습니다.'}else if(state.winner===myColor){box.classList.add('win');$('#resultBig').textContent='🎉 승리!';$('#resultSub').textContent='축하합니다. 전적과 레이팅이 반영됩니다.'}else{box.classList.add('lose');$('#resultBig').textContent='😵 패배';$('#resultSub').textContent='이번 판은 상대의 승리입니다. 레이팅이 반영됩니다.'}}
+box.classList.remove('hidden');box.classList.remove('win','lose','draw');
+if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent=aiMode?'AI와 무승부입니다. 온라인 레이팅은 변하지 않습니다.':'팽팽한 대국이었습니다.'}
+else if(state.winner===myColor){box.classList.add('win');$('#resultBig').textContent=aiMode?'🤖 AI전 승리!':'🎉 승리!';$('#resultSub').textContent=aiMode?'AI 대전 결과입니다. 온라인 레이팅에는 반영되지 않습니다.':'축하합니다. 전적과 레이팅이 반영됩니다.'}
+else{box.classList.add('lose');$('#resultBig').textContent=aiMode?'🤖 AI전 패배':'😵 패배';$('#resultSub').textContent=aiMode?'AI 대전 결과입니다. 온라인 레이팅에는 반영되지 않습니다.':'이번 판은 상대의 승리입니다. 레이팅이 반영됩니다.'}}
 function renderRequest(){const u=state.requests?.undo,r=state.requests?.rematch,d=state.requests?.draw,box=$('#requestBox');let req=null,type='';
  if(!spectatorMode&&u?.from&&u.from!==myId){req=u;type='undo'}else if(!spectatorMode&&d?.from&&d.from!==myId){req=d;type='draw'}else if(!spectatorMode&&r?.from&&r.from!==myId){req=r;type='rematch'}
  if(req){box.classList.remove('hidden');box.dataset.type=type;$('#requestText').textContent=type==='undo'?`${req.name||'상대'}가 한 수 무르기를 요청했습니다.`:type==='draw'?`${req.name||'상대'}가 무승부를 제안했습니다.`:`${req.name||'상대'}가 재대결을 요청했습니다.`}else box.classList.add('hidden');
@@ -1832,7 +1835,7 @@ $('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='p
    try{await onDisconnect(spectatorRef).cancel()}catch(e){}
    spectatorRef=null;
  }
- if(!spectatorMode)publishPlayingRoom(null);spectatorMode=false;aiMode=false;aiThinking=false;$('#aiModeNote')?.classList.add('hidden');if(unsub){unsub();unsub=null}sessionStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');roomId=null;state=null;myColor=0;pending=null;currentChallenge=null;$('#challengeModal').classList.add('hidden');history.replaceState(null,'',location.pathname);show('lobby');ensureProfile()}
+ if(!spectatorMode)publishPlayingRoom(null);spectatorMode=false;aiMode=false;aiThinking=false;$('#aiModeNote')?.classList.add('hidden');if(unsub){unsub();unsub=null}sessionStorage.removeItem('omokActiveRoom');localStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');roomId=null;state=null;myColor=0;pending=null;currentChallenge=null;$('#challengeModal').classList.add('hidden');history.replaceState(null,'',location.pathname);show('lobby');ensureProfile()}
 
 $('#opponentLeftOk')?.addEventListener('click',()=>{$('#opponentLeftModal')?.classList.add('hidden');leaveLocal()});
 $('#addFriend').addEventListener('click',addFriendByCode);
@@ -1936,7 +1939,27 @@ $('#profileImageInput').addEventListener('change',e=>{const file=e.target.files?
 $('#removeProfileImage').addEventListener('click',()=>{$('#profileEditor').dataset.photo='';$('#profilePreview').textContent='🙂';$('#profileImageInput').value=''});
 
 
-document.body.classList.remove('in-game');show('lobby');const q=new URLSearchParams(location.search).get('room');if(q){$('#codeInput').value=q;show('home');$('#joinBox').classList.remove('hidden');history.replaceState(null,'',location.pathname);msg('homeMsg','초대받은 방 코드가 입력되었습니다. 입장을 눌러 참가하세요.')}
+async function restoreActiveRoom(){
+ const saved=localStorage.getItem('omokActiveRoom')||sessionStorage.getItem('omokActiveRoom');
+ if(!saved||!/^\d{6}$/.test(saved))return false;
+ try{
+   const s=await get(ref(db,'rooms/'+saved)),r=s.val();
+   if(!r){localStorage.removeItem('omokActiveRoom');sessionStorage.removeItem('omokActiveRoom');return false}
+   const isPlayer=r.black?.id===myId||r.white?.id===myId||r.host?.id===myId;
+   if(!isPlayer){localStorage.removeItem('omokActiveRoom');sessionStorage.removeItem('omokActiveRoom');return false}
+   roomId=saved;spectatorMode=false;aiMode=false;myColor=r.black?.id===myId?1:r.white?.id===myId?2:0;
+   sessionStorage.setItem('omokActiveRoom',saved);localStorage.setItem('omokActiveRoom',saved);
+   if(r.status==='waiting'&&!r.black&&!r.white){show('waiting');$('#roomCode').textContent=saved}
+   else{show('game')}
+   listen(saved);await publishPlayingRoom(r.status==='playing'?saved:null);
+   history.replaceState(null,'',location.pathname+'?room='+saved);
+   msg('gameMsg','🔄 새로고침 후 진행 중인 대국에 다시 연결했습니다.');
+   return true;
+ }catch(e){console.error('restore room',e);return false}
+}
+document.body.classList.remove('in-game');show('lobby');
+const restored=await restoreActiveRoom();
+const q=new URLSearchParams(location.search).get('room');if(q&&!restored){$('#codeInput').value=q;show('home');$('#joinBox').classList.remove('hidden');history.replaceState(null,'',location.pathname);msg('homeMsg','초대받은 방 코드가 입력되었습니다. 입장을 눌러 참가하세요.')}
 
 document.addEventListener('click',async e=>{
  const shop=e.target.closest?.('#mileageShopBtn');
