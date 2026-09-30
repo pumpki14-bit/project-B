@@ -223,7 +223,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.19 RANKING CHALLENGE</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.20 SITE BOOT FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;min-width:58px;min-height:58px;flex:0 0 58px;aspect-ratio:1/1;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -1811,7 +1811,7 @@ $('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='p
    }
  }
  leaveLocal();
-});async async function leaveLocal(){
+});async function leaveLocal(){
  if(myId)await logPlayerAction(myId,'퇴장','대국/관전 화면에서 나갔습니다.');
  stopRoomChat();$('#opponentLeftModal')?.classList.add('hidden');
  if(spectatorMode&&spectatorRef){
