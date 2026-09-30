@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.0 SECURE ADMIN PANEL</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.8.1 ADMIN LOGIN DIAG</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -315,6 +315,10 @@ async function adminLogin(){
   if(auth.currentUser){
    const ok=await isAdminUser(auth.currentUser);
    if(ok){await openAdmin(auth.currentUser);return}
+   const registered=(await get(ref(db,'admins'))).val()||{};
+   const keys=Object.keys(registered);
+   alert('Google 로그인은 성공했습니다. 하지만 현재 로그인한 Google 계정의 UID가 admins에 등록된 UID와 다릅니다.\n\n현재 로그인 UID: '+auth.currentUser.uid+'\n등록된 관리자 수: '+keys.length+'명\n\nFirebase Authentication의 이 Google 계정 UID를 admins 아래에 true로 등록해 주세요.');
+   return;
   }
   const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(mobile){sessionStorage.setItem('omokAdminLoginPending','1');await signInWithRedirect(auth,googleProvider);return}
@@ -389,11 +393,14 @@ onAuthStateChanged(auth,async user=>{
  const ok=await isAdminUser(user);
  adminAuthChecked=ok;
  if(ok){
-  $('#adminLogin').textContent='🛡️ 관리자 패널';
-  // 리다이렉트 복귀 직후에는 관리자인지 눈에 확실히 보이게 패널을 연다.
-  if(location.hash==='#admin-login-return'||sessionStorage.getItem('omokAdminLoginPending')==='1'){
+  $('#adminLogin').textContent='🛡️ 관리자 패널 · 인증됨';
+  sessionStorage.removeItem('omokAdminLoginPending');
+  await openAdmin(user);
+ }else{
+  $('#adminLogin').textContent='⚠️ 로그인됨 · 관리자 UID 확인';
+  if(sessionStorage.getItem('omokAdminLoginPending')==='1'){
    sessionStorage.removeItem('omokAdminLoginPending');
-   await openAdmin(user);
+   alert('Google 로그인은 성공했지만 관리자 UID가 일치하지 않습니다.\n현재 로그인 UID: '+user.uid);
   }
  }
 });
