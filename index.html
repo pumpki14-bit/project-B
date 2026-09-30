@@ -163,7 +163,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.8 ADMIN + LIVE</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.7.9 ELO + ADMIN FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -283,7 +283,7 @@ var __g=document.getElementById('game');if(__g)__g.classList.add('hidden');
 </script>
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
-import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 import {getDatabase,ref,set,get,update,onValue,runTransaction,remove,onDisconnect,push} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js';
 const firebaseConfig={apiKey:'AIzaSyBaiY8zg-Gt6sUzCE66RKDJyNBATi-wS-k',authDomain:'omok-7642e.firebaseapp.com',databaseURL:'https://omok-7642e-default-rtdb.asia-southeast1.firebasedatabase.app/',projectId:'omok-7642e',storageBucket:'omok-7642e.firebasestorage.app',messagingSenderId:'469622813122',appId:'1:469622813122:web:43e75c885d3b475dfde65b'};
 const app=initializeApp(firebaseConfig),db=getDatabase(app),auth=getAuth(app),googleProvider=new GoogleAuthProvider(),$=s=>document.querySelector(s);document.getElementById('jsStatus').textContent='정상';document.addEventListener('touchstart',()=>{}, {passive:true});const N=15,P=30,S=(640-P*2)/(N-1),dirs=[[1,0],[0,1],[1,1],[1,-1]];
@@ -296,26 +296,44 @@ function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt
 
 async function adminLogin(){
  try{
-  let result;
-  try{result=await signInWithPopup(auth,googleProvider)}
-  catch(e){if(/popup|operation-not-supported|cancelled-popup/i.test(String(e?.code||e)))return signInWithRedirect(auth,googleProvider);throw e}
+  if(auth.currentUser){await openAdmin(auth.currentUser);return}
+  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(mobile){await signInWithRedirect(auth,googleProvider);return}
+  const result=await signInWithPopup(auth,googleProvider);
   if(result?.user)await openAdmin(result.user);
- }catch(e){console.error(e);alert('관리자 로그인에 실패했습니다.')}
+ }catch(e){
+  console.error('admin login',e);
+  alert('관리자 로그인 실패: '+(e?.code||e?.message||String(e)));
+ }
 }
 async function openAdmin(user){
- let ok=false;try{ok=(await get(ref(db,'admins/'+user.uid))).val()===true}catch(e){console.error('admin check',e);alert('관리자 정보 읽기가 차단되어 있습니다. Realtime Database 규칙에 admins 읽기 권한을 추가해야 합니다.');return}
- if(!ok){alert('Google 로그인은 됐지만 이 UID가 관리자 목록에 없습니다. admins/내UID = true인지 확인하세요.');return}
- show('adminPanel');$('#adminWho').textContent='관리자 로그인됨';
+ let v=null;
+ try{v=(await get(ref(db,'admins/'+user.uid))).val()}
+ catch(e){console.error('admin check',e);alert('관리자 확인 실패: '+(e?.code||e?.message||String(e)));return}
+ const ok=(v===true||v==='true'||v===1);
+ if(!ok){alert('Google 로그인은 성공했습니다. 하지만 이 계정 UID가 admins에 등록되어 있지 않습니다.\n현재 로그인 UID: '+user.uid);return}
+ show('adminPanel');
+ $('#adminWho').textContent='🛡️ 관리자 · '+(user.email||user.uid);
+ $('#adminLogin').textContent='🛡️ 관리자 패널';
  const snap=await get(ref(db,'users')),rows=Object.entries(snap.val()||{});
- $('#adminUsers').innerHTML=rows.map(([id,p])=>`<div class="friendCard" data-admin-user="${id}"><div class="friendMain"><b>${String(p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">${p.wins||0}승 ${p.losses||0}패 · 🪙 ${(p.coins??1000).toLocaleString()}</div></div><button class="adminGive secondary" type="button">🎁 지급</button></div>`).join('');
- document.querySelectorAll('.adminGive').forEach(btn=>btn.addEventListener('click',async()=>{const uid=btn.closest('[data-admin-user]').dataset.adminUser,item=prompt('지급할 아이템 이름을 입력하세요.');if(!item)return;await runTransaction(ref(db,`users/${uid}/inventory/${encodeURIComponent(item)}`),v=>Number(v||0)+1);alert('1개 지급했습니다.')}))
+ $('#adminUsers').innerHTML=rows.map(([id,p])=>`<div class="friendCard" data-admin-user="${id}"><div class="friendMain"><b>${String(p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">레이팅 ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 · 🪙 ${(p.coins??1000).toLocaleString()}</div></div><button class="adminGive secondary" type="button">🎁 지급</button></div>`).join('');
+ document.querySelectorAll('.adminGive').forEach(btn=>btn.addEventListener('click',async()=>{
+   const uid=btn.closest('[data-admin-user]').dataset.adminUser,item=prompt('지급할 아이템 이름을 입력하세요.');
+   if(!item)return;
+   await runTransaction(ref(db,`users/${uid}/inventory/${encodeURIComponent(item)}`),v=>Number(v||0)+1);
+   alert('1개 지급했습니다.');
+ }))
 }
-getRedirectResult(auth).then(r=>{if(r?.user)openAdmin(r.user)}).catch(console.error);
+getRedirectResult(auth).then(r=>{if(r?.user)openAdmin(r.user)}).catch(e=>console.error('redirect result',e));
+onAuthStateChanged(auth,user=>{if(user){$('#adminLogin').textContent='🛡️ 관리자 패널';}});
 function openRanking(){
  show('ranking');if(rankingUnsub)rankingUnsub();
  rankingUnsub=onValue(ref(db,'users'),snap=>{
-  const rows=Object.entries(snap.val()||{}).map(([id,p])=>{const w=+p.wins||0,l=+p.losses||0,d=+p.draws||0,g=Math.max(+p.games||0,w+l+d),rate=w+l?w/(w+l):0;return {p,w,l,d,g,rate}}).filter(r=>r.g>0).sort((a,b)=>b.w-a.w||b.rate-a.rate||b.g-a.g).slice(0,50);
-  $('#rankingList').innerHTML=rows.length?rows.map((r,i)=>`<div class="friendCard"><b style="min-width:34px">${i+1}위</b><div class="friendMain"><b>${String(r.p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div class="muted">${r.w}승 ${r.l}패 ${r.d}무 · 승률 ${Math.round(r.rate*100)}%</div></div></div>`).join(''):'기록 없음';
+  const rows=Object.entries(snap.val()||{}).map(([id,p])=>{
+    const w=+p.wins||0,l=+p.losses||0,d=+p.draws||0,g=Math.max(+p.games||0,w+l+d),rate=w+l?w/(w+l):0,rating=Math.round(Number(p.rating??1000));
+    return {id,p,w,l,d,g,rate,rating}
+  }).filter(r=>r.g>0).sort((a,b)=>b.rating-a.rating||b.w-a.w||b.rate-a.rate||b.g-a.g).slice(0,50);
+  $('#rankingList').innerHTML=rows.length?rows.map((r,i)=>`<div class="friendCard"><b style="min-width:42px">${i+1}위</b><div class="friendMain"><b>${String(r.p.name||'플레이어').replace(/[<>&"']/g,'')}</b><div><strong>⭐ ${r.rating}</strong> <span class="muted">· ${r.w}승 ${r.l}패 ${r.d}무 · 승률 ${Math.round(r.rate*100)}%</span></div></div></div>`).join(''):'아직 랭킹에 등록된 플레이어가 없습니다.';
  });
 }
 async function setPresence(){
@@ -358,7 +376,7 @@ async function initSocial(){
       const isPending=ch&&ch.status==='pending';
       div.innerHTML=`<div class="friendInfo"><div class="friendAvatar">${avatar}</div>
       <div class="friendMain"><div class="friendTop"><div class="friendName">${safeName}</div><span class="badge ${pres.online?(pres.room?'playingDot':'onlineDot'):'offlineDot'}">${pres.online?(pres.room?'● 게임중':'● 온라인'):'● 오프라인'}</span></div>
-      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins??1000).toLocaleString()}</div></div></div>
+      <div class="stats friendTitleLine">🏷️ ${safeTitle?titleHTML(safeTitle):'<span class="muted">칭호 없음</span>'}</div><div class="stats">⭐ ${Math.round(Number(p.rating??1000))} · ${w}승 ${p.losses||0}패 ${p.draws||0}무 · 승률 ${rate}% · ${g}전 · 🪙${Number(p.coins??1000).toLocaleString()}</div></div></div>
       <div class="friendActions"><button type="button" class="challengeBtn ${isPending?'pending':''}" ${(!pres.online||pres.room)&&!isPending?'disabled':''}>${pres.room?'🎮 게임 중':(isPending?'신청 취소':'⚔️ 대결 신청')}</button><button type="button" class="friendMore secondary" aria-label="친구 메뉴">⋯</button></div>
       <div class="friendMoreMenu hidden"><button type="button" class="friendWatch secondary" ${pres.room?'':'disabled'}>👁️ 관전하기</button><button type="button" class="friendDelete danger">친구 삭제</button></div>`;
       const challenge=div.querySelector('.challengeBtn');
@@ -474,7 +492,7 @@ function listenOutgoingChallenges(){
     }
   })
 }
-async function ensureProfile(){const r=ref(db,'users/'+myId);await runTransaction(r,p=>{p=p||{wins:0,losses:0,draws:0,games:0,createdAt:Date.now()};p.name=nick();p.lastSeen=Date.now();return p});if(profileUnsub)profileUnsub();profileUnsub=onValue(r,s=>{const p=s.val()||{};const g=p.games||0,w=p.wins||0;$('#homeRecord').textContent=`${w}승 ${p.losses||0}패 ${p.draws||0}무`;$('#homeRate').textContent=`승률 ${g?Math.round(w/g*100):0}%`;renderAccount(p)})}initSocial().catch(e=>{console.error(e);msg('friendMsg','친구 기능 연결 중 오류가 발생했습니다. Firebase Rules를 확인해주세요.')});
+async function ensureProfile(){const r=ref(db,'users/'+myId);await runTransaction(r,p=>{p=p||{wins:0,losses:0,draws:0,games:0,rating:1000,createdAt:Date.now()};if(p.rating==null)p.rating=1000;p.name=nick();p.lastSeen=Date.now();return p});if(profileUnsub)profileUnsub();profileUnsub=onValue(r,s=>{const p=s.val()||{};const g=p.games||0,w=p.wins||0;$('#homeRecord').textContent=`${w}승 ${p.losses||0}패 ${p.draws||0}무`;$('#homeRate').textContent=`승률 ${g?Math.round(w/g*100):0}%`;renderAccount(p)})}initSocial().catch(e=>{console.error(e);msg('friendMsg','친구 기능 연결 중 오류가 발생했습니다. Firebase Rules를 확인해주세요.')});
 ensureProfile().catch(e=>{console.error(e);msg('homeMsg','전적 정보를 불러오지 못했습니다.')});
 listenOutgoingChallenges();
 
@@ -528,7 +546,7 @@ function applyFrame(el,name=''){
 }
 function renderAccount(p={}){
  myProfile=p;const w=p.wins||0;const coins=(p.coins??1000);if($('#coinLobby'))$('#coinLobby').textContent=`🪙 ${coins.toLocaleString()}`;if($('#coinGacha'))$('#coinGacha').textContent=`🪙 ${coins.toLocaleString()}`;
- $('#lobbyName').textContent=p.name||nick();$('#lobbyRecord').textContent=`${w}승 ${p.losses||0}패 ${p.draws||0}무 · 최고 ${p.bestStreak||0}연승`;
+ $('#lobbyName').textContent=p.name||nick();$('#lobbyRecord').textContent=`⭐ ${Math.round(Number(p.rating??1000))} · ${w}승 ${p.losses||0}패 ${p.draws||0}무 · 최고 ${p.bestStreak||0}연승`;
  if(p.photo){$('#avatar').innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`}else{$('#avatar').textContent=p.avatar||'🙂'}
  $('#lobbyTitle').innerHTML=titleHTML(p.title||'');
  applyFrame($('#avatar'),p.frame||'');applyFrame($('#profilePreview'),p.frame||'');
@@ -579,7 +597,11 @@ const GACHA=[
 ];
 function rarityRoll(forceEpic=false){
  const x=Math.random()*100;
- if(x<1.5)return'chroma';if(x<6)return'legendary';if(forceEpic||x<19)return'epic';if(x<48)return'rare';return'common';
+ if(x<2)return'chroma';
+ if(x<8)return'legendary';
+ if(forceEpic||x<23)return'epic';
+ if(x<55)return'rare';
+ return'common';
 }
 function pickItem(forceEpic=false){
  const r=rarityRoll(forceEpic),pool=GACHA.filter(x=>x.r===r);return pool[Math.floor(Math.random()*pool.length)];
@@ -823,14 +845,14 @@ function aiMove(){
     best=Math.random()<.55?moves[Math.floor(Math.random()*moves.length)]
       :moves.sort((a,b)=>pointScore(root,b,aiColor)-pointScore(root,a,aiColor))[0];
   }else if(best==null&&aiDifficulty==='normal'){
-    best=moves.map(i=>[i,pointScore(root,i,aiColor)*1.25+pointScore(root,i,playerColor)+Math.random()*5000])
+    best=moves.map(i=>[i,pointScore(root,i,aiColor)*1.45+pointScore(root,i,playerColor)*1.30+Math.random()*2200])
       .sort((a,b)=>b[1]-a[1])[0][0];
   }else if(best==null&&aiDifficulty==='hard'){
-    best=moves.map(i=>[i,forcingScore(root,i,aiColor,playerColor)+pointScore(root,i,playerColor)*1.35])
+    best=moves.map(i=>[i,forcingScore(root,i,aiColor,playerColor)*1.15+pointScore(root,i,playerColor)*1.70])
       .sort((a,b)=>b[1]-a[1])[0][0];
   }else if(best==null){
     // Expert/Master/Impossible: tactical minimax over a pruned forcing-move tree.
-    const cfg=aiDifficulty==='expert'?{width:8,depth:2}:aiDifficulty==='master'?{width:10,depth:3}:{width:11,depth:3};
+    const cfg=aiDifficulty==='expert'?{width:10,depth:3}:aiDifficulty==='master'?{width:12,depth:3}:{width:13,depth:4};
     const order=(board,p,opp,width)=>{
       const c=nearby(board,2).filter(i=>legal(board,i,p));
       const wins=c.filter(i=>winAt(board,i,p));if(wins.length)return wins.slice(0,width);
@@ -845,7 +867,7 @@ function aiMove(){
         if(legal(board,i,aiColor))a=Math.max(a,pointScore(board,i,aiColor));
         if(legal(board,i,playerColor))o=Math.max(o,pointScore(board,i,playerColor));
       }
-      return a-o*1.12;
+      return a-o*1.28;
     };
     const search=(board,turn,depth,alpha,beta)=>{
       const opp=turn===aiColor?playerColor:aiColor;
@@ -926,7 +948,7 @@ async function watchRoom(code){
  });
 }
 function arr(){let b=state?.board||[];if(Array.isArray(b))return Array.from({length:N*N},(_,i)=>Number(b[i]||0));let a=Array(N*N).fill(0);Object.keys(b).forEach(k=>a[+k]=Number(b[k]||0));return a}function moves(){let m=state?.moves||[];if(Array.isArray(m))return m.filter(Boolean);return Object.keys(m).sort((a,b)=>+a-+b).map(k=>m[k])}
-async function fetchStats(id,el){if(!id){$(el).textContent='-';return}const p=(await get(ref(db,'users/'+id))).val()||{};$(el).textContent=`${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · ${p.games||0}전`}
+async function fetchStats(id,el){if(!id){$(el).textContent='-';return}const p=(await get(ref(db,'users/'+id))).val()||{};$(el).textContent=`⭐ ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · ${p.games||0}전`}
 function render(){const b=arr();if($('#spectatorCount'))$('#spectatorCount').textContent=`👁️ 관전자 ${Object.keys(state?.spectators||{}).length}명`;$('#blackName').textContent=state.black?.name||'연결 끊김';$('#whiteName').textContent=state.white?.name||'연결 끊김';fetchStats(state.black?.id,'#blackStats');fetchStats(state.white?.id,'#whiteStats');$('#blackCard').classList.toggle('active',state.status==='playing'&&state.turn===1);$('#whiteCard').classList.toggle('active',state.status==='playing'&&state.turn===2);let opponent=aiMode?'AI':'친구';
 let st=spectatorMode
  ? (state.status==='finished'?(state.winner===0?'관전 · 무승부':`관전 · ${state.winner===1?'흑':'백'} 승리`):`👁️ 관전 중 · ${state.turn===1?'흑':'백'} 차례`)
@@ -935,7 +957,7 @@ $('#status').textContent=st;
 ['place','clearPick','undo','rematch','resign'].forEach(id=>{const el=$('#'+id);if(el)el.disabled=spectatorMode});renderRequest();renderResult();if(state.status!=='playing'||state.turn!==myColor){pending=null}updatePickUI();draw(b)}
 function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){box.classList.add('hidden');return}
  if(!aiMode&&Number(state.bet||0)>0){const k=`omokBetShown_${roomId}_${state.gameId}`;let seen=false;try{seen=sessionStorage.getItem(k)==='1'}catch(e){}if(!seen){try{sessionStorage.setItem(k,'1')}catch(e){}const bet=Number(state.bet);if(state.winner===0)showCoinSettlement(0,'🤝 베팅금 반환','');else if(state.winner===myColor)showCoinSettlement(bet,'🎉 코인전 승리','win');else showCoinSettlement(-bet,'💸 코인전 패배','lose')}}
-box.classList.remove('hidden');box.classList.remove('win','lose','draw');if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent='팽팽한 대국이었습니다.'}else if(state.winner===myColor){box.classList.add('win');$('#resultBig').textContent='🎉 승리!';$('#resultSub').textContent='축하합니다. 전적에 1승이 기록됩니다.'}else{box.classList.add('lose');$('#resultBig').textContent='😵 패배';$('#resultSub').textContent='이번 판은 상대의 승리입니다.'}}
+box.classList.remove('hidden');box.classList.remove('win','lose','draw');if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent='팽팽한 대국이었습니다.'}else if(state.winner===myColor){box.classList.add('win');$('#resultBig').textContent='🎉 승리!';$('#resultSub').textContent='축하합니다. 전적과 레이팅이 반영됩니다.'}else{box.classList.add('lose');$('#resultBig').textContent='😵 패배';$('#resultSub').textContent='이번 판은 상대의 승리입니다. 레이팅이 반영됩니다.'}}
 function renderRequest(){const u=state.requests?.undo,r=state.requests?.rematch,box=$('#requestBox');let req=null,type='';if(u?.from&&u.from!==myId){req=u;type='undo'}else if(r?.from&&r.from!==myId){req=r;type='rematch'}if(req){box.classList.remove('hidden');box.dataset.type=type;$('#requestText').textContent=type==='undo'?`${req.name||'상대'}가 한 수 무르기를 요청했습니다.`:`${req.name||'상대'}가 재대결을 요청했습니다.`}else box.classList.add('hidden');let mineUndo=u?.from===myId,mineRematch=r?.from===myId;$('#undo').textContent=mineUndo?'무르기 요청 중…':'무르기 요청';$('#rematch').textContent=mineRematch?'재대결 요청 중…':'재대결';$('#undo').disabled=spectatorMode||state.status!=='playing'||moves().length===0||!!u;$('#rematch').disabled=spectatorMode||state.status!=='finished'||!!r}
 function updatePickUI(){const ok=pending&&state?.status==='playing'&&state.turn===myColor;$('#place').disabled=!ok;$('#clearPick').disabled=!pending;$('#pickMsg').textContent=pending?`${String.fromCharCode(65+pending.x)}${pending.y+1} 선택됨 · 착수를 눌러 확정하세요.`:(state?.turn===myColor&&state?.status==='playing'?'빈 교차점을 누른 뒤 착수 버튼을 눌러주세요.':'상대의 착수를 기다리는 중입니다.')}
 function draw(b){const cv=$('#board'),c=cv.getContext('2d');
@@ -984,7 +1006,25 @@ async function settleRoomBet(){
    await runTransaction(ref(db,`users/${winner}/coins`),v=>Number(v??0)+pot);
  }
 }
-async function maybeRecordResult(){if(state.status!=='finished'||state.resultRecorded)return;const claim=await runTransaction(ref(db,'rooms/'+roomId+'/resultRecorded'),v=>v?undefined:myId);if(!claim.committed||claim.snapshot.val()!==myId)return;const ids=[state.black?.id,state.white?.id].filter(Boolean);for(const id of ids){const color=id===state.black.id?1:2;await applyResultStats(id,state.winner===color,color,(state.moves||[]).length,state.winner===0)}await settleRoomBet();await update(ref(db,'rooms/'+roomId),{betSettled:true})}
+
+function eloExpected(ra,rb){return 1/(1+Math.pow(10,(rb-ra)/400))}
+function eloDelta(ra,rb,score){
+ const K=32;
+ return Math.round(K*(score-eloExpected(ra,rb)));
+}
+async function applyRoomRatings(){
+ if(!state?.black?.id||!state?.white?.id||state.black.id==='AI'||state.white.id==='AI')return;
+ const [bs,ws]=await Promise.all([get(ref(db,'users/'+state.black.id)),get(ref(db,'users/'+state.white.id))]);
+ const bp=bs.val()||{},wp=ws.val()||{},br=Math.round(Number(bp.rating??1000)),wr=Math.round(Number(wp.rating??1000));
+ const bScore=state.winner===0?.5:(state.winner===1?1:0),wScore=1-bScore;
+ const bd=eloDelta(br,wr,bScore),wd=eloDelta(wr,br,wScore);
+ await Promise.all([
+  runTransaction(ref(db,`users/${state.black.id}/rating`),v=>Math.max(100,Math.round(Number(v??1000)+bd))),
+  runTransaction(ref(db,`users/${state.white.id}/rating`),v=>Math.max(100,Math.round(Number(v??1000)+wd)))
+ ]);
+ await update(ref(db,'rooms/'+roomId),{ratingChange:{black:bd,white:wd,beforeBlack:br,beforeWhite:wr}});
+}
+async function maybeRecordResult(){if(state.status!=='finished'||state.resultRecorded)return;const claim=await runTransaction(ref(db,'rooms/'+roomId+'/resultRecorded'),v=>v?undefined:myId);if(!claim.committed||claim.snapshot.val()!==myId)return;const ids=[state.black?.id,state.white?.id].filter(Boolean);for(const id of ids){const color=id===state.black.id?1:2;await applyResultStats(id,state.winner===color,color,(state.moves||[]).length,state.winner===0)}await applyRoomRatings();await settleRoomBet();await update(ref(db,'rooms/'+roomId),{betSettled:true})}
 $('#undo').addEventListener('click',async()=>{if(aiMode){if(!state?.moves?.length)return;let m=state.moves.slice(),b=arr(),aiColor=myColor===1?2:1;let last=m.pop();if(last)b[last.y*N+last.x]=0;if(last?.color===aiColor&&m.length){let prev=m.pop();b[prev.y*N+prev.x]=0}state.moves=m;state.board=b;state.turn=myColor;state.status='playing';state.winner=0;pending=null;render();return}if(state?.status!=='playing'||!moves().length)return;await set(ref(db,'rooms/'+roomId+'/requests/undo'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 무르기 수락을 기다리고 있습니다.')});$('#rematch').addEventListener('click',async()=>{if(state?.status!=='finished')return;if(aiMode){startAi();return}await set(ref(db,'rooms/'+roomId+'/requests/rematch'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 재대결 수락을 기다리고 있습니다.')});
 $('#acceptReq').addEventListener('click',async()=>{const type=$('#requestBox').dataset.type;if(type==='undo'){await runTransaction(ref(db,'rooms/'+roomId),room=>{if(!room?.requests?.undo)return;let m=Array.isArray(room.moves)?room.moves.filter(Boolean):[];const last=m.pop();if(!last){room.requests.undo=null;return room}let b=Array.isArray(room.board)?room.board.slice():Array.from({length:N*N},(_,i)=>Number(room.board?.[i]||0));b[last.y*N+last.x]=0;room.board=b;room.moves=m;room.turn=last.color;room.requests.undo=null;return room})}else if(type==='rematch'){const a=state.black,b=state.white,swap=Math.random()<.5;const black=swap?b:a,white=swap?a:b;await update(ref(db,'rooms/'+roomId),{black,white,board:Array(N*N).fill(0),moves:[],turn:1,winner:0,status:'playing',requests:{undo:null,rematch:null},resultRecorded:false,gameId:Date.now()});myColor=black.id===myId?1:2;pending=null;msg('gameMsg','재대결! 흑/백을 다시 랜덤으로 정했습니다.')}});$('#rejectReq').addEventListener('click',async()=>{const type=$('#requestBox').dataset.type;await set(ref(db,'rooms/'+roomId+'/requests/'+type),null);msg('gameMsg',type==='undo'?'무르기 요청을 거절했습니다.':'재대결 요청을 거절했습니다.')});
 $('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='playing'){state.status='finished';state.winner=2;await recordAiResult(false);render()}return}if(state?.status==='playing')await update(ref(db,'rooms/'+roomId),{status:'finished',winner:otherColor(),resultRecorded:false})});$('#create').addEventListener('click',createRoom);$('#joinBtn').addEventListener('click',()=>$('#joinBox').classList.toggle('hidden'));$('#join').addEventListener('click',()=>joinRoom($('#codeInput').value));$('#cancel').addEventListener('click',async()=>{if(roomId)await remove(ref(db,'rooms/'+roomId));leaveLocal()});$('#copy').addEventListener('click',async()=>{const u=location.origin+location.pathname+'?room='+roomId;try{await navigator.clipboard.writeText(u);msg('waitMsg','초대 링크를 복사했습니다.')}catch{msg('waitMsg','방 코드 '+roomId+' 를 친구에게 보내세요.')}});$('#leave').addEventListener('click',()=>leaveLocal());function leaveLocal(){if(!spectatorMode)publishPlayingRoom(null);spectatorMode=false;aiMode=false;aiThinking=false;$('#aiModeNote')?.classList.add('hidden');if(unsub){unsub();unsub=null}sessionStorage.removeItem('omokActiveRoom');document.body.classList.remove('in-game');roomId=null;state=null;myColor=0;pending=null;currentChallenge=null;$('#challengeModal').classList.add('hidden');history.replaceState(null,'',location.pathname);show('lobby');ensureProfile()}
@@ -1069,7 +1109,7 @@ $('#claimAttendance').addEventListener('click',claimAttendance);
 
 function renderGachaInfo(){
  const labels={frame:'프로필 테두리',title:'특별 칭호',stone:'오목돌 스킨',place:'착수 이펙트',winfx:'승리 이펙트'};
- const rarities=[['common','COMMON · 55%',55],['rare','RARE · 28%',28],['epic','EPIC · 12%',12],['legendary','LEGENDARY · 4%',4],['chroma','CHROMA · 1%',1]];
+ const rarities=[['common','COMMON · 45%',45],['rare','RARE · 32%',32],['epic','EPIC · 15%',15],['legendary','LEGENDARY · 6%',6],['chroma','CHROMA · 2%',2]];
  $('#gachaItemList').innerHTML=rarities.map(([r,label,pct])=>{const pool=GACHA.filter(x=>x.r===r),each=(pct/pool.length).toFixed(2);return `<div class="lootGroup"><h3 class="r-${r}">${label}</h3>${pool.map(x=>`<div class="lootLine" style="display:flex;justify-content:space-between;gap:8px"><span>${x.n} <span class="muted">· ${labels[x.type]||x.type}</span></span><b>${each}%</b></div>`).join('')}</div>`}).join('');
 }
 $('#openGachaInfo').addEventListener('click',()=>{renderGachaInfo();$('#gachaInfoModal').classList.remove('hidden')});
