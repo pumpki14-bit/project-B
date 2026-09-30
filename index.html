@@ -223,7 +223,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.20 SITE BOOT FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.21 DRAW SCOPE + LOG CLEAR FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;min-width:58px;min-height:58px;flex:0 0 58px;aspect-ratio:1/1;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -340,6 +340,7 @@ onclick="document.body.classList.remove('in-game');document.getElementById('home
 <div id="adminAllLogsPanel" class="hidden">
  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>📚 전체 플레이어 활동 로그</h3><button id="adminAllLogsClose" class="secondary" type="button" style="width:auto">닫기</button></div>
  <div id="adminAllLogs" class="adminChatList muted">로그를 불러오는 중...</div>
+<button id="adminClearAllPlayerLogs" type="button" class="danger" style="width:100%;margin-top:8px">🗑️ 전체 플레이어 로그 모두 삭제</button>
 </div>
 <div id="adminUsers">사용자를 불러오는 중...</div>
 <h3>🌐 전체 채팅 관리</h3>
@@ -377,17 +378,6 @@ var __g=document.getElementById('game');if(__g)__g.classList.add('hidden');
   window.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('myFriendCode');if(el)el.textContent=code});
 })();
 
-async function offerDraw(){
- if(aiMode||spectatorMode||!roomId||!state||state.status!=='playing'){msg('gameMsg','지금은 무승부를 제안할 수 없습니다.');return}
- const rr=await runTransaction(ref(db,`rooms/${roomId}/requests/draw`),v=>{
-   if(v?.from)return;
-   return {from:myId,name:nick(),at:Date.now()};
- });
- if(rr.committed)msg('gameMsg','🤝 상대에게 무승부 요청을 보냈습니다.');
- else msg('gameMsg','이미 처리 중인 무승부 요청이 있습니다.');
-}
-const drawBtn=$('#drawOffer');
-if(drawBtn)drawBtn.onclick=offerDraw;
 
 if($('#historyBtn'))$('#historyBtn').onclick=openHistory;
 if($('#missionsBtn'))$('#missionsBtn').onclick=openMissions;
@@ -638,6 +628,13 @@ async function renderAllPlayerLogs(){
 }
 $('#adminAllLogsBtn')?.addEventListener('click',async()=>{$('#adminAllLogsPanel').classList.remove('hidden');await renderAllPlayerLogs()});
 $('#adminAllLogsClose')?.addEventListener('click',()=>$('#adminAllLogsPanel').classList.add('hidden'));
+$('#adminClearAllPlayerLogs')?.addEventListener('click',async()=>{
+ if(!(await isAdminUser(auth.currentUser))){alert('관리자만 전체 로그를 삭제할 수 있습니다.');return}
+ if(!confirm('모든 플레이어의 활동 로그를 전부 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;
+ await remove(ref(db,'playerLogs'));
+ await writeAdminLog('전체 플레이어 로그 삭제','playerLogs','모든 플레이어 활동 로그 삭제');
+ await renderAllPlayerLogs();
+});
 async function renderAdminGlobalChat(){
  const box=$('#adminGlobalChat');if(!box)return;
  if(!(await isAdminUser(auth.currentUser))){box.textContent='관리자 권한이 없습니다.';return}
@@ -1785,6 +1782,22 @@ async function settleAcceptedDraw(){
  ]);
 }
 async function maybeRecordResult(){if(state?.drawAccepted)return;if(state.status!=='finished'||state.resultRecorded)return;const claim=await runTransaction(ref(db,'rooms/'+roomId+'/resultRecorded'),v=>v?undefined:myId);if(!claim.committed||claim.snapshot.val()!==myId)return;const ids=[state.black?.id,state.white?.id].filter(Boolean);for(const id of ids){const color=id===state.black.id?1:2;await applyResultStats(id,state.winner===color,color,(state.moves||[]).length,state.winner===0)}await applyRoomRatings();await settleRoomBet();await appendMatchHistory();await checkAchievements(state.black.id);await checkAchievements(state.white.id);await update(ref(db,'rooms/'+roomId),{betSettled:true})}
+
+async function offerDraw(){
+ if(aiMode||spectatorMode||!roomId||!state||state.status!=='playing'){
+   msg('gameMsg','지금은 무승부를 제안할 수 없습니다.');return;
+ }
+ try{
+   const path=`rooms/${roomId}/requests/draw`;
+   const rr=await runTransaction(ref(db,path),v=>{
+     if(v&&v.from)return;
+     return {from:myId,name:nick(),at:Date.now()};
+   });
+   if(rr.committed)msg('gameMsg','🤝 상대에게 무승부 요청을 보냈습니다.');
+   else msg('gameMsg','이미 무승부 요청이 진행 중입니다.');
+ }catch(e){console.error('draw offer',e);msg('gameMsg','무승부 요청 전송에 실패했습니다.');}
+}
+$('#drawOffer')?.addEventListener('click',offerDraw);
 $('#undo').addEventListener('click',async()=>{if(aiMode){if(!state?.moves?.length)return;let m=state.moves.slice(),b=arr(),aiColor=myColor===1?2:1;let last=m.pop();if(last)b[last.y*N+last.x]=0;if(last?.color===aiColor&&m.length){let prev=m.pop();b[prev.y*N+prev.x]=0}state.moves=m;state.board=b;state.turn=myColor;state.status='playing';state.winner=0;pending=null;render();return}if(state?.status!=='playing'||!moves().length)return;await set(ref(db,'rooms/'+roomId+'/requests/undo'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 무르기 수락을 기다리고 있습니다.')});$('#rematch').addEventListener('click',async()=>{if(state?.status!=='finished')return;if(aiMode){startAi();return}await set(ref(db,'rooms/'+roomId+'/requests/rematch'),{from:myId,name:nick(),at:Date.now()});msg('gameMsg','상대의 재대결 수락을 기다리고 있습니다.')});
 $('#acceptReq').addEventListener('click',async()=>{const type=$('#requestBox').dataset.type;if(type==='undo'){await runTransaction(ref(db,'rooms/'+roomId),room=>{if(!room?.requests?.undo)return;let m=Array.isArray(room.moves)?room.moves.filter(Boolean):[];const last=m.pop();if(!last){room.requests.undo=null;return room}let b=Array.isArray(room.board)?room.board.slice():Array.from({length:N*N},(_,i)=>Number(room.board?.[i]||0));b[last.y*N+last.x]=0;room.board=b;room.moves=m;room.turn=last.color;room.requests.undo=null;return room})}else if(type==='draw'){
  const rr=await runTransaction(ref(db,'rooms/'+roomId),room=>{
