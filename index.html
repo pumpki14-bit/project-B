@@ -223,7 +223,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button type="button" id="bgmToggle" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🎵 BGM ON</button>
 <button type="button" id="openAchievements" class="secondary" style="min-height:36px;padding:0 10px;font-size:13px">🏆 업적</button>
 </div>
-<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.22 REFRESH REJOIN + AI RESULT FIX</span> <span id="jsStatus" class="pill">로딩…</span></p>
+<h1>⚫ 오목 ⚪</h1><p class="muted">플레이할 모드를 선택하세요. <span class="pill">v13.9.23 AI SPECTATE + LOG CLEANUP</span> <span id="jsStatus" class="pill">로딩…</span></p>
 <div class="profile"><div style="display:flex;gap:10px;align-items:center"><div id="avatar" style="width:58px;height:58px;min-width:58px;min-height:58px;flex:0 0 58px;aspect-ratio:1/1;border-radius:50%;background:#eee;display:grid;place-items:center;font-size:30px;overflow:hidden">🙂</div><div><strong id="lobbyName">플레이어</strong><div id="lobbyTitle" class="muted">칭호 없음</div><div id="lobbyRecord" class="stats">0승 0패 0무</div></div></div><button type="button" id="editProfile" class="secondary">프로필 수정</button></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0">
 <button id="openAttendance" type="button" class="secondary" style="width:auto;min-height:40px">📅 출석체크</button>
@@ -736,19 +736,9 @@ async function openRankingPlayer(uid){
  });
  $('#playerInfoModal').classList.remove('hidden');
 }
-document.addEventListener('visibilitychange',async()=>{
- if(!myId)return;
- if(document.visibilityState==='hidden'){
-   const k='omokHiddenLogAt',now=Date.now(),last=Number(sessionStorage.getItem(k)||0);
-   if(now-last>30000){sessionStorage.setItem(k,String(now));await logPlayerAction(myId,'접속 상태','사이트를 벗어나거나 백그라운드로 이동했습니다.')}
- }else{
-   await setPresence();
-   await logPlayerAction(myId,'접속 상태','사이트로 돌아왔습니다.');
- }
-});
 async function setPresence(){
   presenceRef=ref(db,'presence/'+myId);
-  await set(presenceRef,{online:true,name:nick(),at:Date.now(),room:(!aiMode&&roomId)?roomId:null});
+  await set(presenceRef,{online:true,name:nick(),at:Date.now(),room:aiMode?`AI:${myId}`:(roomId||null)});
   onDisconnect(presenceRef).set({online:false,name:nick(),at:Date.now(),room:null});
 }
 let presenceHeartbeat=null;
@@ -756,13 +746,13 @@ function startPresenceHeartbeat(){
  if(presenceHeartbeat)clearInterval(presenceHeartbeat);
  presenceHeartbeat=setInterval(()=>{
   if(document.visibilityState==='visible'){
-   update(ref(db,'presence/'+myId),{online:true,name:nick(),at:Date.now(),room:(!aiMode&&roomId)?roomId:null}).catch(()=>{});
+   update(ref(db,'presence/'+myId),{online:true,name:nick(),at:Date.now(),room:aiMode?`AI:${myId}`:(roomId||null)}).catch(()=>{});
   }
  },30000);
 }
 document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'){
-  update(ref(db,'presence/'+myId),{online:true,name:nick(),at:Date.now(),room:(!aiMode&&roomId)?roomId:null}).catch(()=>{});
+  update(ref(db,'presence/'+myId),{online:true,name:nick(),at:Date.now(),room:aiMode?`AI:${myId}`:(roomId||null)}).catch(()=>{});
  }
 });
 startPresenceHeartbeat();
@@ -819,7 +809,12 @@ async function initSocial(){
   inboxUnsub=onValue(ref(db,'challenges/'+myId),snap=>{
     const all=snap.val()||{},entries=Object.entries(all).filter(([,v])=>v&&v.status==='pending').sort((a,b)=>(b[1].at||0)-(a[1].at||0));
     if(!entries.length){currentChallenge=null;$('#challengeModal').classList.add('hidden');return}
-    const [key,v]=entries[0];currentChallenge={key,...v};
+    const [key,v]=entries[0];
+    if(aiMode&&!spectatorMode){
+      update(ref(db,`challenges/${myId}/${key}`),{status:'rejected',reason:'ai_busy',rejectedAt:Date.now()}).catch(()=>{});
+      currentChallenge=null;$('#challengeModal').classList.add('hidden');return;
+    }
+    currentChallenge={key,...v};
     get(ref(db,'users/'+v.from)).then(ps=>{const p=ps.val()||{},bet=Number(v.bet||0);$('#challengeText').textContent=`${v.fromName||p.name||'친구'}님이 대결을 신청했습니다.${p.title?' · '+p.title:''}`;$('#challengeBetInfo').textContent=bet?`🪙 ${bet.toLocaleString()} 코인전 · 승자 총 ${(bet*2).toLocaleString()}코인`:'무료 대전';}).catch(()=>{$('#challengeText').textContent=`${v.fromName||'친구'}님이 대결을 신청했습니다.`;$('#challengeBetInfo').textContent=Number(v.bet||0)?`🪙 ${Number(v.bet).toLocaleString()} 코인전`:'무료 대전'});
     $('#challengeModal').classList.remove('hidden');
   },e=>console.error(e));
@@ -905,7 +900,7 @@ function listenOutgoingChallenges(){
     for(const [target,items] of Object.entries(all)){
       const v=items?.[myId];
       if(!v)continue;
-      if(v.status==='accepted'&&v.room){if(pendingChallengeTarget&&target!==pendingChallengeTarget)continue;
+      if(v.status==='accepted'&&v.room){if(aiMode&&!spectatorMode)continue;if(pendingChallengeTarget&&target!==pendingChallengeTarget)continue;
         const targetId=target, challengeRef=ref(db,`challenges/${targetId}/${myId}`);
         roomId=v.room;const rs=all;sessionStorage.setItem('omokActiveRoom',roomId);localStorage.setItem('omokActiveRoom',roomId);
         get(ref(db,'rooms/'+roomId)).then(s=>{const rr=s.val();myColor=rr?.black?.id===myId?1:2;show('game');listen(roomId)});
@@ -1298,13 +1293,38 @@ async function applyResultStats(id,won,color,moveCount,draw=false){
   p.lastSeen=Date.now();return p
  })
 }
+
+let aiSpectateUnsub=null;
+async function publishAiGame(){
+ if(!aiMode||spectatorMode||!myId||!state)return;
+ try{
+   await set(ref(db,`aiGames/${myId}`),{...state,ownerId:myId,ownerName:nick(),difficulty:aiDifficulty,updatedAt:Date.now()});
+   await publishPlayingRoom(`AI:${myId}`);
+ }catch(e){console.error('publish AI game',e)}
+}
+async function removeAiGame(){
+ if(!myId)return;
+ try{await remove(ref(db,`aiGames/${myId}`));const pr=(await get(ref(db,`presence/${myId}/room`))).val();if(pr===`AI:${myId}`)await publishPlayingRoom(null)}catch(e){}
+}
+async function watchAiGame(ownerId){
+ ownerId=String(ownerId||'').trim();if(!ownerId)return;
+ const s=await get(ref(db,`aiGames/${ownerId}`));if(!s.exists()){msg('homeMsg','AI 대전이 이미 종료되었습니다.');return}
+ spectatorMode=true;aiMode=false;roomId=`AI:${ownerId}`;myColor=0;
+ if(unsub)unsub();
+ unsub=onValue(ref(db,`aiGames/${ownerId}`),snap=>{
+   if(!snap.exists()){msg('gameMsg','AI 대전 관전이 종료되었습니다.');setTimeout(()=>leaveLocal(),700);return}
+   state=snap.val();show('game');$('#aiModeNote').textContent=`👁️ AI 대전 관전 · ${state.ownerName||'플레이어'} VS AI`;$('#aiModeNote').classList.remove('hidden');
+   ['place','clearPick','undo','drawOffer','rematch','resign','roomChatSend','roomChatInput'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=true});
+   document.querySelectorAll('[data-qchat]').forEach(e=>e.disabled=true);$('#roomChatBox')?.classList.add('hidden');render();
+ });
+}
 function startAi(){
  aiMode=true;roomId=null;pending=null;myColor=Math.random()<.5?1:2;
  const me={id:myId,name:nick()},bot={id:'AI',name:'AI'};
  state=freshRoom(myColor===1?me:bot,myColor===1?bot:me,'playing');
  const dn={easy:'쉬움',normal:'보통',hard:'어려움',expert:'전문가',master:'마스터',impossible:'IMPOSSIBLE'}[aiDifficulty]||'보통';
  $('#aiModeNote').textContent=`🤖 AI ${dn} · 흑/백은 매 판 랜덤 · 무르기는 즉시 적용됩니다.`;
- $('#aiModeNote').classList.remove('hidden');show('game');render();
+ $('#aiModeNote').classList.remove('hidden');show('game');render();publishAiGame();
  msg('gameMsg',myColor===1?'랜덤 결과: 내가 흑입니다. 먼저 시작하세요.':'랜덤 결과: AI가 흑입니다. AI가 먼저 시작합니다.');
  if(myColor===2)aiMove();
 }
@@ -1514,6 +1534,7 @@ function listen(c){opponentLeftHandled=false;if(unsub)unsub();unsub=onValue(ref(
  }
  if(state.status==='waiting'){show('waiting');$('#roomCode').textContent=c;return}if(state.black&&state.white){if(!myColor)myColor=state.black.id===myId?1:2;if(!spectatorMode&&!aiMode)publishPlayingRoom(c);show('game');listenRoomChat(c);render();await maybeRecordResult()}})}
 async function watchRoom(code){
+ if(String(code||'').startsWith('AI:'))return watchAiGame(String(code).slice(3));
  if(spectatorRef){try{await remove(spectatorRef)}catch(e){};try{await onDisconnect(spectatorRef).cancel()}catch(e){};spectatorRef=null}
  code=String(code||'').trim();
  if(!/^\d{6}$/.test(code)){msg('homeMsg','6자리 방 코드를 입력하세요.');return}
@@ -1538,13 +1559,14 @@ async function watchRoom(code){
 function arr(){let b=state?.board||[];if(Array.isArray(b))return Array.from({length:N*N},(_,i)=>Number(b[i]||0));let a=Array(N*N).fill(0);Object.keys(b).forEach(k=>a[+k]=Number(b[k]||0));return a}function moves(){let m=state?.moves||[];if(Array.isArray(m))return m.filter(Boolean);return Object.keys(m).sort((a,b)=>+a-+b).map(k=>m[k])}
 async function fetchStats(id,el){if(!id){$(el).textContent='-';return}const p=(await get(ref(db,'users/'+id))).val()||{};$(el).textContent=`⭐ ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · ${p.games||0}전`}
 function render(){
-const b=arr();if($('#spectatorCount'))$('#spectatorCount').textContent=`👁️ 관전자 ${Object.keys(state?.spectators||{}).length}명`;$('#blackName').textContent=state.black?.name||'연결 끊김';$('#whiteName').textContent=state.white?.name||'연결 끊김';fetchStats(state.black?.id,'#blackStats');fetchStats(state.white?.id,'#whiteStats');$('#blackCard').classList.toggle('active',state.status==='playing'&&state.turn===1);$('#whiteCard').classList.toggle('active',state.status==='playing'&&state.turn===2);let opponent=aiMode?'AI':'친구';
+if(aiMode&&!spectatorMode)publishAiGame();
+const b=arr();if($('#spectatorCount'))$('#spectatorCount').textContent=roomId?.startsWith?.('AI:')?'👁️ AI 대전 관전':`👁️ 관전자 ${Object.keys(state?.spectators||{}).length}명`;$('#blackName').textContent=state.black?.name||'연결 끊김';$('#whiteName').textContent=state.white?.name||'연결 끊김';fetchStats(state.black?.id,'#blackStats');fetchStats(state.white?.id,'#whiteStats');$('#blackCard').classList.toggle('active',state.status==='playing'&&state.turn===1);$('#whiteCard').classList.toggle('active',state.status==='playing'&&state.turn===2);let opponent=aiMode?'AI':'친구';
 let st=spectatorMode
  ? (state.status==='finished'?(state.winner===0?'관전 · 무승부':`관전 · ${state.winner===1?'흑':'백'} 승리`):`👁️ 관전 중 · ${state.turn===1?'흑':'백'} 차례`)
  : (state.status==='finished'?(state.winner===0?'무승부':state.winner===myColor?'내가 이겼습니다!':opponent+'가 이겼습니다'):(state.turn===myColor?'내 차례 · 위치를 선택하세요':opponent+' 차례'));
 $('#status').textContent=st;
 ['place','clearPick','undo','rematch','resign'].forEach(id=>{const el=$('#'+id);if(el)el.disabled=spectatorMode});renderRequest();renderResult();if(state.status!=='playing'||state.turn!==myColor){pending=null}updatePickUI();draw(b)}
-function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){box.classList.add('hidden');return}
+function renderResult(){const box=$('#resultBox');if(state.status!=='finished'){box.classList.add('hidden');return}if(aiMode&&!spectatorMode){publishAiGame();setTimeout(()=>removeAiGame(),15000)}
  if(!aiMode&&Number(state.bet||0)>0){const k=`omokBetShown_${roomId}_${state.gameId}`;let seen=false;try{seen=sessionStorage.getItem(k)==='1'}catch(e){}if(!seen){try{sessionStorage.setItem(k,'1')}catch(e){}const bet=Number(state.bet);if(state.winner===0)showCoinSettlement(0,'🤝 베팅금 반환','');else if(state.winner===myColor)showCoinSettlement(bet,'🎉 코인전 승리','win');else showCoinSettlement(-bet,'💸 코인전 패배','lose')}}
 box.classList.remove('hidden');box.classList.remove('win','lose','draw');
 if(state.winner===0){box.classList.add('draw');$('#resultBig').textContent='🤝 무승부';$('#resultSub').textContent=aiMode?'AI와 무승부입니다. 온라인 레이팅은 변하지 않습니다.':'팽팽한 대국이었습니다.'}
@@ -1828,7 +1850,8 @@ $('#resign').addEventListener('click',async()=>{if(aiMode){if(state?.status==='p
  }
  leaveLocal();
 });async function leaveLocal(){
- if(myId)await logPlayerAction(myId,'퇴장','대국/관전 화면에서 나갔습니다.');
+ const leavingOwnAi=aiMode&&!spectatorMode;
+ if(leavingOwnAi)await removeAiGame();
  stopRoomChat();$('#opponentLeftModal')?.classList.add('hidden');
  if(spectatorMode&&spectatorRef){
    try{await remove(spectatorRef)}catch(e){}
