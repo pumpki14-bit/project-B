@@ -501,12 +501,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널</h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
 <p class="muted" id="adminWho"></p>
 <div class="notice" id="adminStatus">관리자 인증 확인 중...</div>
-<input class="adminSearch" id="adminSearch" placeholder="🔎 닉네임 검색"/><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그</button>
-<div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
-<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>📚 전체 플레이어 활동 로그</h3><button class="secondary" id="adminAllLogsClose" style="width:auto" type="button">닫기</button></div>
-<div class="adminChatList muted" id="adminAllLogs" style="max-height:58vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:4px">로그를 불러오는 중...</div>
-<button class="danger" id="adminClearAllPlayerLogs" style="width:100%;margin-top:8px" type="button">🗑️ 전체 플레이어 로그 모두 삭제</button>
-</div>
+<input class="adminSearch" id="adminSearch" placeholder="🔎 닉네임 검색"/>
 <div id="adminUsers">사용자를 불러오는 중...</div>
 <h3>🌐 전체 채팅 관리</h3>
 <div class="notice">최근 전체 채팅을 확인하고 메시지를 개별 삭제하거나 전체 삭제할 수 있습니다.</div>
@@ -521,12 +516,18 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <input id="adminOpsTarget" placeholder="사용자 UID" style="width:100%;margin:6px 0"><input id="adminOpsReason" maxlength="120" placeholder="제재 사유" style="width:100%;margin:6px 0">
 <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="adminOpsDuration"><option value="600000">10분</option><option value="3600000">1시간</option><option value="86400000">1일</option><option value="604800000">7일</option><option value="0">영구</option></select><button id="adminOpsBan" type="button">🚫 차단</button><button id="adminOpsUnban" type="button">차단 해제</button><button id="adminOpsMute" type="button">🔇 채팅 금지</button><button id="adminOpsUnmute" type="button">채팅 금지 해제</button></div>
 <p class="muted" style="font-size:12px">※ 실제 차단·채팅 제한 강제 적용에는 Firebase 보안 규칙과 각 게임의 참가·채팅 코드 연동이 필요합니다. 현재는 제재 기록을 저장하는 관리 기능입니다.</p>
-<h3>🚨 검열 감지 채팅</h3><button id="arcFlagRefresh" type="button">검열 기록 새로고침</button><div id="arcFlagList">조회 전</div><h3>🚫 제재 중인 사용자</h3><div id="adminOpsBanList">조회 전</div><h3>🟢 현재 접속 프로필</h3><div id="adminOpsOnlineList">조회 전</div><h3>🚪 공개방 현황</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button id="adminOpsClearRooms" type="button">🗑️ 전체 방 삭제</button><span id="adminOpsLastCheck" aria-live="polite"></span></div><div id="adminOpsRoomList">새로고침을 누르면 확인할 수 있습니다.</div>
+<h3>🚨 검열 감지 채팅</h3><button id="arcFlagRefresh" type="button">검열 기록 새로고침</button> <button id="arcFlagClear" type="button" class="danger">검열 기록 전체 삭제</button><div id="arcFlagList">조회 전</div><h3>🚫 제재 중인 사용자</h3><div id="adminOpsBanList">조회 전</div><h3>🟢 현재 접속 프로필</h3><div id="adminOpsOnlineList">조회 전</div><h3>🚪 공개방 현황</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button id="adminOpsClearRooms" type="button">🗑️ 전체 방 삭제</button><span id="adminOpsLastCheck" aria-live="polite"></span></div><div id="adminOpsRoomList">새로고침을 누르면 확인할 수 있습니다.</div>
 <h3>⚠️ 오류 기록</h3><div id="adminOpsErrors">이 브라우저의 최근 오류를 수집합니다.</div>
 <h3>📜 관리자 작업 내역</h3><button id="adminOpsClearLogs" type="button" style="margin:8px 0">🗑️ 관리자 활동 기록 전체 삭제</button><div id="adminOpsAudit">조회 전</div>
 <div id="adminOpsMsg" role="status" style="margin-top:8px;color:#b7e4ff"></div>
 </div>
 <h3>🧾 최근 관리자 기록</h3><div class="muted" id="adminLogs">기록 없음</div>
+<details style="margin:16px 0"><summary style="cursor:pointer;padding:12px;border-radius:10px;border:1px solid #789">⚙️ 오목 설정 · 플레이어 로그</summary><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그 보기</button><div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>📚 전체 플레이어 활동 로그</h3><button class="secondary" id="adminAllLogsClose" style="width:auto" type="button">닫기</button></div>
+<div class="adminChatList muted" id="adminAllLogs" style="max-height:58vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:4px">로그를 불러오는 중...</div>
+<button class="danger" id="adminClearAllPlayerLogs" style="width:100%;margin-top:8px" type="button">🗑️ 전체 플레이어 로그 모두 삭제</button>
+</div>
+</details>
 <button class="secondary" id="adminBack" style="width:100%;margin-top:12px" type="button">돌아가기</button></section>
 <section class="card hidden" id="waiting"><h1>친구 기다리는 중</h1><p class="muted">방 코드를 친구에게 보내세요.</p><div class="code" id="roomCode">------</div><button id="copy" style="width:100%" type="button">초대 링크 복사</button><p class="notice">친구가 링크로 접속하거나 방 코드를 입력하면 시작됩니다.</p><button class="secondary" id="cancel" style="width:100%" type="button">방 나가기</button><div class="toast" id="waitMsg"></div></section>
 <section class="hidden" id="game"><div class="card"><div class="players"><div class="player" id="blackCard"><b>⚫ 흑</b><div id="blackName">-</div><div class="stats" id="blackStats">전적 불러오는 중</div></div><div class="player" id="whiteCard"><b>⚪ 백</b><div id="whiteName">-</div><div class="stats" id="whiteStats">전적 불러오는 중</div></div></div><div class="muted" id="spectatorCount" style="text-align:center;margin:5px 0">👁️ 관전자 0명</div><div class="status" id="status">연결 중...</div>
@@ -902,13 +903,28 @@ async function adminOpsAct(kind,clear=false){
  if(clear)await remove(ref(db,`${path}/${uid}`));
  else{const duration=Number($('#adminOpsDuration').value);await set(ref(db,`${path}/${uid}`),{at:Date.now(),until:duration?Date.now()+duration:0,reason,by:auth.currentUser.uid});}
  await writeAdminLog(clear?'제재 해제':kind==='ban'?'사용자 차단 기록':'채팅 금지 기록',uid,reason||'해제');
+ try{const userSnap=await get(ref(db,'users/'+uid));const targetName=String(userSnap.val()?.name||'플레이어');const verb=kind==='ban'?(clear?'차단이 해제되었습니다.':'차단되었습니다.'):(clear?'채팅 금지가 해제되었습니다.':'채팅이 금지되었습니다.');const message=targetName+'님이 '+verb;await push(ref(db,'globalChat'),{name:'📢 운영 알림',text:message,at:Date.now(),type:'notice',from:'system'});}catch(e){console.warn('제재 알림 전송 실패',e);adminOpsStatus('제재는 저장됐지만 전체채팅 알림 전송에 실패했습니다: '+e.message);}
+
  adminOpsStatus('저장 완료. 실제 접속·채팅 차단에는 각 게임과 Firebase 규칙 연동이 필요합니다.');await adminOpsRefresh();
 }
 function bindAdminOps(){
  const on=(id,fn)=>{$('#'+id)?.addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>adminOpsStatus('오류: '+(e.message||e))))};
  on('adminOpsRefresh',()=>adminOpsRefresh('refresh'));on('adminOpsRooms',()=>adminOpsRefresh('inspect'));
  on('adminOpsClearRooms',async()=>{await adminOpsAllowed();if(!confirm('모든 게임의 조회된 방을 삭제합니다. 진행 중인 게임도 종료됩니다. 계속할까요?'))return;const word=prompt('확인하려면 전체삭제를 입력하세요.');if(word!=='전체삭제')return;let done=0,failed=[];for(const [path] of adminOpsSources){try{const snap=await get(ref(db,path));if(snap.exists()){await remove(ref(db,path));done++}}catch(e){failed.push(path+': '+e.message)}}await writeAdminLog('전체 방 삭제',adminOpsSources.map(x=>x[0]).join(','),done+'개 경로 삭제');await adminOpsRefresh('inspect');adminOpsStatus('전체 방 삭제: '+done+'개 경로 처리'+(failed.length?' · 실패: '+failed.join('; '):' · 완료'));});
- $('#adminOps')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(b){$('#adminOpsTarget').value=b.dataset.uid;$('#adminOpsTarget').scrollIntoView({behavior:'smooth',block:'center'});}});
+ $('#adminOps')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(b){const uid=b.dataset.uid;$('#adminOpsTarget').value=uid;
+ const action=prompt('플레이어 관리\n1. 이름 변경\n2. 이름 변경 후 고정\n3. 이름 고정/해제\n4. 차단\n5. 차단 해제\n6. 채팅 금지\n7. 채팅 금지 해제','1');
+ if(action===null)return;
+ (async()=>{await adminOpsAllowed();
+ if(['1','2','3'].includes(action)){
+ const snap=await get(ref(db,'users/'+uid));const oldName=snap.val()?.name||'플레이어';
+ if(action==='3'){const locked=!!snap.val()?.nameLocked;await update(ref(db,'users/'+uid),{nameLocked:!locked});await writeAdminLog(locked?'닉네임 고정 해제':'닉네임 고정',uid);}
+ else{const entered=prompt('새 닉네임 (최대 12자)',oldName);if(entered===null)return;const name=entered.trim();if(!name||name.length>12||arcadeForbiddenName(name))return alert('사용할 수 없는 이름입니다.');await update(ref(db,'users/'+uid),action==='2'?{name,nameLocked:true}:{name});await writeAdminLog(action==='2'?'이름 변경 및 고정':'이름 변경',uid,oldName+' → '+name);}
+ }else if(['4','5','6','7'].includes(action)){
+ const [kind,clear]=({'4':['ban',false],'5':['ban',true],'6':['mute',false],'7':['mute',true]})[action];
+ $('#adminOpsReason').value=clear?'':(prompt('제재 사유','운영 규칙 위반')||'');if(!clear&&!$('#adminOpsReason').value)return;
+ await adminOpsAct(kind,clear);
+ }else return alert('1~7 중 선택하세요.');await renderAdminUsers();await adminOpsRefresh();
+ })().catch(e=>alert('관리 실패: '+e.message));}});
  on('adminOpsBan',()=>adminOpsAct('ban'));on('adminOpsUnban',()=>adminOpsAct('ban',true));
  on('adminOpsMute',()=>adminOpsAct('mute'));on('adminOpsUnmute',()=>adminOpsAct('mute',true));
  on('adminOpsClearNotice',async()=>{await adminOpsAllowed();if(!confirm('현재 상단 공지를 내릴까요?'))return;await remove(ref(db,'arcadeAdminNotice'));adminOpsStatus('✅ 상단 공지를 내렸습니다.');});
@@ -1854,7 +1870,8 @@ async function sendGlobalChat(){
 $('#roomChatSend')?.addEventListener('click',()=>sendRoomChat());
 $('#roomChatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendRoomChat()}});
 document.querySelectorAll('[data-qchat]').forEach(b=>b.addEventListener('click',()=>sendRoomChat(b.dataset.qchat)));
-$('#arcFlagRefresh')?.addEventListener('click',async()=>{const box=$('#arcFlagList');if(!box)return;try{const snap=await get(ref(db,'moderation/flaggedChat'));const entries=Object.values(snap.val()||{}).slice(-50).reverse();box.replaceChildren();for(const r of entries){const div=document.createElement('div');div.textContent=new Date(r.at||0).toLocaleString()+' · '+(r.name||r.from)+' · '+(r.text||'');box.append(div)}if(!entries.length)box.textContent='검열 기록 없음'}catch(e){box.textContent='조회 실패: '+e.message}});
+$('#arcFlagRefresh')?.addEventListener('click',async()=>{const box=$('#arcFlagList');if(!box)return;try{const snap=await get(ref(db,'moderation/flaggedChat'));const entries=Object.entries(snap.val()||{}).slice(-50).reverse();box.replaceChildren();for(const [key,r] of entries){const div=document.createElement('div');div.style.cssText='padding:7px;border-bottom:1px solid #666;display:flex;gap:8px;align-items:center';const label=document.createElement('span');label.style.flex='1';label.textContent=new Date(r.at||0).toLocaleString()+' · '+(r.name||r.from)+' · '+(r.text||'');const del=document.createElement('button');del.type='button';del.textContent='삭제';del.className='danger';del.style.width='auto';del.onclick=async()=>{if(!(await isAdminUser(auth.currentUser)))return;if(!confirm('검열 기록을 삭제할까요?'))return;await remove(ref(db,'moderation/flaggedChat/'+key));await writeAdminLog('검열 기록 삭제',key);$('#arcFlagRefresh').click()};div.append(label,del);box.append(div)}if(!entries.length)box.textContent='검열 기록 없음'}catch(e){box.textContent='조회 실패: '+e.message}});
+$('#arcFlagClear')?.addEventListener('click',async()=>{if(!(await isAdminUser(auth.currentUser)))return alert('관리자 권한이 없습니다.');if(!confirm('검열 감지 채팅 기록을 모두 삭제할까요?'))return;await remove(ref(db,'moderation/flaggedChat'));await writeAdminLog('검열 기록 전체 삭제','moderation/flaggedChat');$('#arcFlagRefresh').click()});
 $('#globalChatSend')?.addEventListener('click',sendGlobalChat);
 $('#globalChatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendGlobalChat()}});
 $('#arcClearChat')?.addEventListener('click',()=>{
