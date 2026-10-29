@@ -509,11 +509,15 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
  <button type="button" data-manage-action="mute" class="danger">🔇 채팅 금지</button><button type="button" data-manage-action="unmute">🔊 채팅 금지 해제</button>
  </div><input id="arcUserManageReason" maxlength="120" placeholder="차단·채팅 금지 사유 (선택)" style="width:100%;box-sizing:border-box;margin-top:12px">
  </div></div>
-<section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널 <small style="font-size:11px;color:#b5e6ff">v4 · 10/29</small></h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
+<section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널 <small style="font-size:11px;color:#b5e6ff">v5 · 온라인 관리 분리</small></h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
 <p class="muted" id="adminWho"></p>
 <div class="notice" id="adminStatus">관리자 인증 확인 중...</div>
-<input class="adminSearch" id="adminSearch" placeholder="🔎 닉네임 검색"/>
-<div id="adminUsers">사용자를 불러오는 중...</div>
+<div class="notice" style="margin-top:10px">🟢 현재 접속 프로필에서 온라인 플레이어를 선택해 관리할 수 있습니다.</div>
+<div id="arcOnlineManageTop" style="margin:10px 0;padding:12px;border-radius:12px;background:#152b40;color:#fff">
+ <h3 style="margin:0 0 8px">🟢 현재 접속 프로필</h3>
+ <div id="arcOnlineManageList">접속자 불러오는 중...</div>
+ <button id="arcOnlineManageRefresh" type="button" style="margin-top:8px">🔄 온라인 목록 새로고침</button>
+</div>
 <h3>🌐 전체 채팅 관리</h3>
 <div class="notice">최근 전체 채팅을 확인하고 메시지를 개별 삭제하거나 전체 삭제할 수 있습니다.</div>
 <div class="adminChatList muted" id="adminGlobalChat">채팅 불러오는 중...</div>
@@ -527,13 +531,17 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <input id="adminOpsTarget" placeholder="사용자 UID" style="width:100%;margin:6px 0"><input id="adminOpsReason" maxlength="120" placeholder="제재 사유" style="width:100%;margin:6px 0">
 <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="adminOpsDuration"><option value="600000">10분</option><option value="3600000">1시간</option><option value="86400000">1일</option><option value="604800000">7일</option><option value="0">영구</option></select><button id="adminOpsBan" type="button">🚫 차단</button><button id="adminOpsUnban" type="button">차단 해제</button><button id="adminOpsMute" type="button">🔇 채팅 금지</button><button id="adminOpsUnmute" type="button">채팅 금지 해제</button></div>
 <p class="muted" style="font-size:12px">※ 실제 차단·채팅 제한 강제 적용에는 Firebase 보안 규칙과 각 게임의 참가·채팅 코드 연동이 필요합니다. 현재는 제재 기록을 저장하는 관리 기능입니다.</p>
-<h3>🚨 검열 감지 채팅</h3><button id="arcFlagRefresh" type="button">검열 기록 새로고침</button> <button id="arcFlagClear" type="button" class="danger">검열 기록 전체 삭제</button><div id="arcFlagList">조회 전</div><h3>🚫 제재 중인 사용자</h3><div id="adminOpsBanList">조회 전</div><h3>🟢 현재 접속 프로필</h3><div id="adminOpsOnlineList">조회 전</div><h3>🚪 공개방 현황</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button id="adminOpsClearRooms" type="button">🗑️ 전체 방 삭제</button><span id="adminOpsLastCheck" aria-live="polite"></span></div><div id="adminOpsRoomList">새로고침을 누르면 확인할 수 있습니다.</div>
+<h3>🚨 검열 감지 채팅</h3><button id="arcFlagRefresh" type="button">검열 기록 새로고침</button> <button id="arcFlagClear" type="button" class="danger">검열 기록 전체 삭제</button><div id="arcFlagList">조회 전</div><h3>🚫 제재 중인 사용자</h3><div id="adminOpsBanList">조회 전</div><div id="adminOpsOnlineList" style="display:none" aria-hidden="true"></div><h3>🚪 공개방 현황</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button id="adminOpsClearRooms" type="button">🗑️ 전체 방 삭제</button><span id="adminOpsLastCheck" aria-live="polite"></span></div><div id="adminOpsRoomList">새로고침을 누르면 확인할 수 있습니다.</div>
 <h3>⚠️ 오류 기록</h3><div id="adminOpsErrors">이 브라우저의 최근 오류를 수집합니다.</div>
 <h3>📜 관리자 작업 내역</h3><button id="adminOpsClearLogs" type="button" style="margin:8px 0">🗑️ 관리자 활동 기록 전체 삭제</button><div id="adminOpsAudit">조회 전</div>
 <div id="adminOpsMsg" role="status" style="margin-top:8px;color:#b7e4ff"></div>
 </div>
 <h3>🧾 최근 관리자 기록</h3><div class="muted" id="adminLogs">기록 없음</div>
-<details style="margin:16px 0"><summary style="cursor:pointer;padding:12px;border-radius:10px;border:1px solid #789;background:#254563;color:#fff;font-weight:700">⚙️ 오목 설정 · 플레이어 로그 (펼치기)</summary><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그 보기</button><div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
+<details id="arcOmokAdminSettings" style="margin:16px 0"><summary style="cursor:pointer;padding:12px;border-radius:10px;border:1px solid #789;background:#254563;color:#fff;font-weight:700">⚙️ 오목 설정 (플레이어 기록·코인·로그)</summary>
+<h3>⚫ 오목 플레이어 관리</h3>
+<input class="adminSearch" id="adminSearch" placeholder="🔎 오목 플레이어 닉네임 검색"/>
+<div id="adminUsers">사용자를 불러오는 중...</div>
+<hr style="margin:18px 0;border-color:#789"><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그 보기</button><div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>📚 전체 플레이어 활동 로그</h3><button class="secondary" id="adminAllLogsClose" style="width:auto" type="button">닫기</button></div>
 <div class="adminChatList muted" id="adminAllLogs" style="max-height:58vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:4px">로그를 불러오는 중...</div>
 <button class="danger" id="adminClearAllPlayerLogs" style="width:100%;margin-top:8px" type="button">🗑️ 전체 플레이어 로그 모두 삭제</button>
@@ -891,6 +899,10 @@ async function adminOpsRefresh(mode='refresh'){
   }
  });
  $('#adminOpsStats').textContent=`🟢 접속 기록 ${online.length}개 · 🎮 게임 중 ${playing}명 · 👥 등록 사용자 ${Object.keys(users).length}명 · 🚪 조회된 방 ${rows.length}개`;
+ $('#arcOnlineManageList').innerHTML=online.length?online.map(([id,x])=>{
+  const player=users[id]||{};const label=String(player.name||x.name||'플레이어');
+  return `<div style="padding:10px 0;border-bottom:1px solid #466078;display:flex;align-items:center;justify-content:space-between;gap:8px"><span><b>👤 ${escAdmin(label)}</b><br><small>${x.room?'🎮 게임 중':'🟢 로비'} ${player.nameLocked?' · 🔒 이름 고정':''}</small></span><button type="button" class="adminOpsPickUser" data-uid="${escAdmin(id)}" style="width:auto;flex-shrink:0">⚙️ 관리</button></div>`;
+ }).join(''):'현재 온라인 플레이어가 없습니다.';
  $('#adminOpsOnlineList').innerHTML=online.length?online.map(([id,x])=>{
   const name=users[id]?.name||x.name||'플레이어';const lockLabel=users[id]?.nameLocked?' 🔒 이름 고정':'';
   return `<div style="padding:9px 0;border-bottom:1px solid #466078"><b>👤 ${escAdmin(name)}</b>${lockLabel} · ${x.room?'🎮 '+escAdmin(x.room):'🟢 로비'}<br><small>최근 신호: ${new Date(Number(x.at)).toLocaleTimeString('ko-KR')} · ID: ${escAdmin(id)}</small> <button type="button" class="adminOpsPickUser" data-uid="${escAdmin(id)}">⚙️ 관리 · 이름/차단</button></div>`;
@@ -921,6 +933,7 @@ async function adminOpsAct(kind,clear=false){
 }
 function bindAdminOps(){
  const on=(id,fn)=>{$('#'+id)?.addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>adminOpsStatus('오류: '+(e.message||e))))};
+ on('arcOnlineManageRefresh',()=>adminOpsRefresh('refresh'));
  on('adminOpsRefresh',()=>adminOpsRefresh('refresh'));on('adminOpsRooms',()=>adminOpsRefresh('inspect'));
  on('adminOpsClearRooms',async()=>{await adminOpsAllowed();if(!confirm('모든 게임의 조회된 방을 삭제합니다. 진행 중인 게임도 종료됩니다. 계속할까요?'))return;const word=prompt('확인하려면 전체삭제를 입력하세요.');if(word!=='전체삭제')return;let done=0,failed=[];for(const [path] of adminOpsSources){try{const snap=await get(ref(db,path));if(snap.exists()){await remove(ref(db,path));done++}}catch(e){failed.push(path+': '+e.message)}}await writeAdminLog('전체 방 삭제',adminOpsSources.map(x=>x[0]).join(','),done+'개 경로 삭제');await adminOpsRefresh('inspect');adminOpsStatus('전체 방 삭제: '+done+'개 경로 처리'+(failed.length?' · 실패: '+failed.join('; '):' · 완료'));});
  $('#adminPanel')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(!b)return;
