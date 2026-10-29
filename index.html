@@ -498,7 +498,18 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button class="secondary" id="mileageShopBack" style="width:100%;margin-top:12px">캡슐로 돌아가기</button></section>
 <section class="card hidden" id="history"><h1>📜 최근 전적</h1><div id="historyList"></div><button class="secondary" id="historyBack" style="width:100%;margin-top:12px">돌아가기</button></section>
 <section class="card hidden" id="missions"><h1>🎯 일일 미션</h1><div id="missionList"></div><button class="secondary" id="missionsBack" style="width:100%;margin-top:12px">돌아가기</button></section>
-<section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널</h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
+<div id="arcUserManageModal" class="hidden" style="display:none;position:fixed;inset:0;background:#000b;z-index:1000002;align-items:center;justify-content:center;padding:16px">
+ <div role="dialog" aria-modal="true" aria-labelledby="arcUserManageTitle" style="width:min(100%,430px);max-height:85vh;overflow:auto;border-radius:18px;padding:18px;background:#172d44;color:#fff;box-shadow:0 12px 40px #0009">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 id="arcUserManageTitle" style="margin:0">👤 플레이어 관리</h2><button id="arcUserManageClose" type="button" style="width:auto">✕ 닫기</button></div>
+ <p style="opacity:.8;font-size:13px">이름만 변경하거나, 변경 후 고정할 수 있습니다. 아래에서 제재 및 해제도 가능합니다.</p>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+ <button type="button" data-manage-action="rename">✏️ 이름만 변경</button><button type="button" data-manage-action="renameLock">🔒 이름 변경 + 고정</button>
+ <button type="button" data-manage-action="toggleLock">🔓 이름 고정 / 해제</button><span></span>
+ <button type="button" data-manage-action="ban" class="danger">🚫 차단</button><button type="button" data-manage-action="unban">✅ 차단 해제</button>
+ <button type="button" data-manage-action="mute" class="danger">🔇 채팅 금지</button><button type="button" data-manage-action="unmute">🔊 채팅 금지 해제</button>
+ </div><input id="arcUserManageReason" maxlength="120" placeholder="차단·채팅 금지 사유 (선택)" style="width:100%;box-sizing:border-box;margin-top:12px">
+ </div></div>
+<section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널 <small style="font-size:11px;color:#b5e6ff">v4 · 10/29</small></h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
 <p class="muted" id="adminWho"></p>
 <div class="notice" id="adminStatus">관리자 인증 확인 중...</div>
 <input class="adminSearch" id="adminSearch" placeholder="🔎 닉네임 검색"/>
@@ -522,7 +533,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <div id="adminOpsMsg" role="status" style="margin-top:8px;color:#b7e4ff"></div>
 </div>
 <h3>🧾 최근 관리자 기록</h3><div class="muted" id="adminLogs">기록 없음</div>
-<details style="margin:16px 0"><summary style="cursor:pointer;padding:12px;border-radius:10px;border:1px solid #789">⚙️ 오목 설정 · 플레이어 로그</summary><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그 보기</button><div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
+<details style="margin:16px 0"><summary style="cursor:pointer;padding:12px;border-radius:10px;border:1px solid #789;background:#254563;color:#fff;font-weight:700">⚙️ 오목 설정 · 플레이어 로그 (펼치기)</summary><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그 보기</button><div class="hidden" id="adminAllLogsPanel" style="border:1px solid #ddd;border-radius:14px;padding:10px;margin:8px 0">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>📚 전체 플레이어 활동 로그</h3><button class="secondary" id="adminAllLogsClose" style="width:auto" type="button">닫기</button></div>
 <div class="adminChatList muted" id="adminAllLogs" style="max-height:58vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:4px">로그를 불러오는 중...</div>
 <button class="danger" id="adminClearAllPlayerLogs" style="width:100%;margin-top:8px" type="button">🗑️ 전체 플레이어 로그 모두 삭제</button>
@@ -724,6 +735,7 @@ async function renderAdminUsers(){
    <div class="friendMain"><b>${escAdmin(p.name||'플레이어')}${me}</b>
    <div class="muted">${status} · ⭐ ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · 🪙 ${Number(p.coins??1000).toLocaleString()} · 🎟️ ${Number(p.mileage||0).toLocaleString()}</div></div>
    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+    <button class="adminOpsPickUser" data-uid="${escAdmin(id)}" type="button">⚙️ 관리</button>
     <button class="adminPlayerLog secondary" data-uid="${escAdmin(id)}" type="button">📋 로그</button>
     <button class="adminRename secondary" data-uid="${escAdmin(id)}" type="button">✏️ 이름 변경</button>
     <button class="adminNameLock secondary" data-uid="${escAdmin(id)}" data-locked="${p.nameLocked?'1':'0'}" type="button">${p.nameLocked?'🔒 이름 고정 해제':'🔓 이름 고정'}</button> ${playing?`<button class="adminWatch secondary" data-room="${escAdmin(pr.room)}" type="button">👁️ 관전</button>`:''}
@@ -880,8 +892,8 @@ async function adminOpsRefresh(mode='refresh'){
  });
  $('#adminOpsStats').textContent=`🟢 접속 기록 ${online.length}개 · 🎮 게임 중 ${playing}명 · 👥 등록 사용자 ${Object.keys(users).length}명 · 🚪 조회된 방 ${rows.length}개`;
  $('#adminOpsOnlineList').innerHTML=online.length?online.map(([id,x])=>{
-  const name=users[id]?.name||x.name||'플레이어';
-  return `<div style="padding:9px 0;border-bottom:1px solid #466078"><b>👤 ${escAdmin(name)}</b> · ${x.room?'🎮 '+escAdmin(x.room):'🟢 로비'}<br><small>최근 신호: ${new Date(Number(x.at)).toLocaleTimeString('ko-KR')} · ID: ${escAdmin(id)}</small> <button type="button" class="adminOpsPickUser" data-uid="${escAdmin(id)}">관리</button></div>`;
+  const name=users[id]?.name||x.name||'플레이어';const lockLabel=users[id]?.nameLocked?' 🔒 이름 고정':'';
+  return `<div style="padding:9px 0;border-bottom:1px solid #466078"><b>👤 ${escAdmin(name)}</b>${lockLabel} · ${x.room?'🎮 '+escAdmin(x.room):'🟢 로비'}<br><small>최근 신호: ${new Date(Number(x.at)).toLocaleTimeString('ko-KR')} · ID: ${escAdmin(id)}</small> <button type="button" class="adminOpsPickUser" data-uid="${escAdmin(id)}">⚙️ 관리 · 이름/차단</button></div>`;
  }).join(''):'현재 유효한 접속 기록 없음';
  $('#adminOpsBanList').innerHTML=Object.entries(bans).filter(([id,x])=>x&&(Number(x.until||0)===0||Number(x.until)>now)).map(([id,x])=>`<div style="padding:8px 0;border-bottom:1px solid #466078"><b>${escAdmin(users[id]?.name||id)}</b> · ${Number(x.until||0)===0?'영구':new Date(Number(x.until)).toLocaleString('ko-KR')+'까지'}<br>사유: ${escAdmin(x.reason||'미입력')} <button type="button" class="adminOpsPickUser" data-uid="${escAdmin(id)}">관리</button></div>`).join('')||'현재 제재 중인 사용자 없음';
  $('#adminOpsRoomList').innerHTML=rows.length?rows.slice(0,150).map(r=>`<div style="padding:7px 0;border-bottom:1px solid #466078">${escAdmin(r.label)} · ${escAdmin(r.id)} · 참가 기록 ${r.count}명 <button type="button" data-ops-path="${escAdmin(r.path)}" data-ops-id="${escAdmin(r.id)}" class="adminOpsDeleteRoom">방 삭제</button></div>`).join(''):'조회된 방 없음';
@@ -903,7 +915,7 @@ async function adminOpsAct(kind,clear=false){
  if(clear)await remove(ref(db,`${path}/${uid}`));
  else{const duration=Number($('#adminOpsDuration').value);await set(ref(db,`${path}/${uid}`),{at:Date.now(),until:duration?Date.now()+duration:0,reason,by:auth.currentUser.uid});}
  await writeAdminLog(clear?'제재 해제':kind==='ban'?'사용자 차단 기록':'채팅 금지 기록',uid,reason||'해제');
- try{const userSnap=await get(ref(db,'users/'+uid));const targetName=String(userSnap.val()?.name||'플레이어');const verb=kind==='ban'?(clear?'차단이 해제되었습니다.':'차단되었습니다.'):(clear?'채팅 금지가 해제되었습니다.':'채팅이 금지되었습니다.');const message=targetName+'님이 '+verb;await push(ref(db,'globalChat'),{name:'📢 운영 알림',text:message,at:Date.now(),type:'notice',from:'system'});}catch(e){console.warn('제재 알림 전송 실패',e);adminOpsStatus('제재는 저장됐지만 전체채팅 알림 전송에 실패했습니다: '+e.message);}
+ try{const userSnap=await get(ref(db,'users/'+uid));const targetName=String(userSnap.val()?.name||'플레이어');const verb=kind==='ban'?(clear?'차단이 해제되었습니다.':'차단되었습니다.'):(clear?'채팅 금지가 해제되었습니다.':'채팅이 금지되었습니다.');const message=targetName+'님이 '+verb;await push(ref(db,'globalChat'),{name:'📢 운영 알림',text:message,at:Date.now(),type:'notice',from:'system'});await set(ref(db,'moderation/latestAnnouncement'),{text:message,at:Date.now(),by:auth.currentUser.uid});}catch(e){console.warn('제재 알림 전송 실패',e);adminOpsStatus('제재는 저장됐지만 전체채팅 알림 전송에 실패했습니다: '+e.message);}
 
  adminOpsStatus('저장 완료. 실제 접속·채팅 차단에는 각 게임과 Firebase 규칙 연동이 필요합니다.');await adminOpsRefresh();
 }
@@ -911,20 +923,41 @@ function bindAdminOps(){
  const on=(id,fn)=>{$('#'+id)?.addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>adminOpsStatus('오류: '+(e.message||e))))};
  on('adminOpsRefresh',()=>adminOpsRefresh('refresh'));on('adminOpsRooms',()=>adminOpsRefresh('inspect'));
  on('adminOpsClearRooms',async()=>{await adminOpsAllowed();if(!confirm('모든 게임의 조회된 방을 삭제합니다. 진행 중인 게임도 종료됩니다. 계속할까요?'))return;const word=prompt('확인하려면 전체삭제를 입력하세요.');if(word!=='전체삭제')return;let done=0,failed=[];for(const [path] of adminOpsSources){try{const snap=await get(ref(db,path));if(snap.exists()){await remove(ref(db,path));done++}}catch(e){failed.push(path+': '+e.message)}}await writeAdminLog('전체 방 삭제',adminOpsSources.map(x=>x[0]).join(','),done+'개 경로 삭제');await adminOpsRefresh('inspect');adminOpsStatus('전체 방 삭제: '+done+'개 경로 처리'+(failed.length?' · 실패: '+failed.join('; '):' · 완료'));});
- $('#adminOps')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(b){const uid=b.dataset.uid;$('#adminOpsTarget').value=uid;
- const action=prompt('플레이어 관리\n1. 이름 변경\n2. 이름 변경 후 고정\n3. 이름 고정/해제\n4. 차단\n5. 차단 해제\n6. 채팅 금지\n7. 채팅 금지 해제','1');
- if(action===null)return;
- (async()=>{await adminOpsAllowed();
- if(['1','2','3'].includes(action)){
- const snap=await get(ref(db,'users/'+uid));const oldName=snap.val()?.name||'플레이어';
- if(action==='3'){const locked=!!snap.val()?.nameLocked;await update(ref(db,'users/'+uid),{nameLocked:!locked});await writeAdminLog(locked?'닉네임 고정 해제':'닉네임 고정',uid);}
- else{const entered=prompt('새 닉네임 (최대 12자)',oldName);if(entered===null)return;const name=entered.trim();if(!name||name.length>12||arcadeForbiddenName(name))return alert('사용할 수 없는 이름입니다.');await update(ref(db,'users/'+uid),action==='2'?{name,nameLocked:true}:{name});await writeAdminLog(action==='2'?'이름 변경 및 고정':'이름 변경',uid,oldName+' → '+name);}
- }else if(['4','5','6','7'].includes(action)){
- const [kind,clear]=({'4':['ban',false],'5':['ban',true],'6':['mute',false],'7':['mute',true]})[action];
- $('#adminOpsReason').value=clear?'':(prompt('제재 사유','운영 규칙 위반')||'');if(!clear&&!$('#adminOpsReason').value)return;
- await adminOpsAct(kind,clear);
- }else return alert('1~7 중 선택하세요.');await renderAdminUsers();await adminOpsRefresh();
- })().catch(e=>alert('관리 실패: '+e.message));}});
+ $('#adminPanel')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(!b)return;
+ const uid=b.dataset.uid;$('#adminOpsTarget').value=uid;
+ const modal=$('#arcUserManageModal');modal.dataset.uid=uid;
+ const display=b.closest('div')?.querySelector('b')?.textContent||'플레이어';
+ $('#arcUserManageTitle').textContent='👤 '+display.replace(/^👤\s*/,'')+' 관리';
+ $('#arcUserManageReason').value='';modal.classList.remove('hidden');modal.style.display='flex';
+ });
+ $('#arcUserManageClose')?.addEventListener('click',()=>{const m=$('#arcUserManageModal');m.style.display='none';m.classList.add('hidden')});
+ $('#arcUserManageModal')?.addEventListener('click',e=>{if(e.target.id==='arcUserManageModal')$('#arcUserManageClose').click()});
+ $('#arcUserManageModal')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-manage-action]');if(!b)return;
+  const modal=$('#arcUserManageModal'),uid=modal.dataset.uid,action=b.dataset.manageAction;
+  try{
+   await adminOpsAllowed();$('#adminOpsTarget').value=uid;
+   if(['rename','renameLock','toggleLock'].includes(action)){
+    const snap=await get(ref(db,'users/'+uid)),user=snap.val()||{},oldName=user.name||'플레이어';
+    if(action==='toggleLock'){
+     await update(ref(db,'users/'+uid),{nameLocked:!user.nameLocked});
+     await writeAdminLog(user.nameLocked?'닉네임 고정 해제':'닉네임 고정',uid);
+    }else{
+     const entered=prompt('새 닉네임 (최대 12자)',oldName);if(entered===null)return;
+     const name=entered.trim();if(!name||name.length>12||arcadeForbiddenName(name))throw Error('사용할 수 없는 이름입니다.');
+     await update(ref(db,'users/'+uid),action==='renameLock'?{name,nameLocked:true}:{name});
+     await writeAdminLog(action==='renameLock'?'닉네임 변경 및 고정':'닉네임 변경',uid,oldName+' → '+name);
+    }
+   }else{
+    const map={ban:['ban',false],unban:['ban',true],mute:['mute',false],unmute:['mute',true]};
+    const pair=map[action];if(!pair)return;
+    $('#adminOpsReason').value=pair[1]?'':($('#arcUserManageReason').value.trim()||'운영 규칙 위반');
+    await adminOpsAct(pair[0],pair[1]);
+   }
+   await renderAdminUsers();await adminOpsRefresh();
+   $('#arcUserManageClose').click();
+  }catch(err){alert('관리 작업 실패: '+(err.message||err))}
+ });
  on('adminOpsBan',()=>adminOpsAct('ban'));on('adminOpsUnban',()=>adminOpsAct('ban',true));
  on('adminOpsMute',()=>adminOpsAct('mute'));on('adminOpsUnmute',()=>adminOpsAct('mute',true));
  on('adminOpsClearNotice',async()=>{await adminOpsAllowed();if(!confirm('현재 상단 공지를 내릴까요?'))return;await remove(ref(db,'arcadeAdminNotice'));adminOpsStatus('✅ 상단 공지를 내렸습니다.');});
@@ -944,7 +977,13 @@ bindAdminOps();
   banner.textContent='📢 관리자 공지: '+String(v.text).slice(0,160);
   banner.style.display='block';
  },err=>console.warn('공지 수신 실패',err));
-})();;
+})();
+(function setupModerationAnnouncement(){
+ const banner=document.createElement('div');banner.id='arcadeModerationAlert';banner.setAttribute('role','status');
+ banner.style.cssText='display:none;position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483000;max-width:min(95vw,540px);width:max-content;box-sizing:border-box;padding:12px 18px;border-radius:12px;background:#7d2440;color:#fff;box-shadow:0 8px 28px #0008;border:1px solid #ffc4d1;text-align:center;font-weight:700';
+ document.body.appendChild(banner);let timeout;
+ onValue(ref(db,'moderation/latestAnnouncement'),snap=>{const v=snap.val();if(!v?.text||!v.at||Date.now()-Number(v.at)>20000)return;banner.textContent='📢 '+String(v.text).slice(0,180);banner.style.display='block';clearTimeout(timeout);timeout=setTimeout(()=>banner.style.display='none',8500);},()=>{});
+})();
 
 // Ban gate for the main arcade client. Firebase rules must independently enforce bans.
 let arcadeBanActive=false;
