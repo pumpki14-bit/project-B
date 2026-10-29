@@ -516,7 +516,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <h2 style="margin:0 0 10px">📊 운영 대시보드</h2>
 <div id="adminOpsStats" aria-live="polite">통계를 불러오는 중...</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button id="adminOpsRefresh" type="button">🔄 새로고침</button><button id="adminOpsRooms" type="button">🧹 방 점검</button></div>
-<h3>📢 전체 공지</h3><input id="adminOpsNotice" maxlength="160" placeholder="전체 공지 내용 (최대 160자)" style="width:100%;margin-bottom:8px"><button id="adminOpsSendNotice" type="button">공지 발송</button>
+<h3>📢 전체 공지</h3><input id="adminOpsNotice" maxlength="160" placeholder="전체 공지 내용 (최대 160자)" style="width:100%;margin-bottom:8px"><button id="adminOpsSendNotice" type="button">공지 발송</button> <button id="adminOpsClearNotice" type="button" class="secondary">공지 내리기</button>
 <h3>👥 사용자 제재</h3><div class="muted">사용자 ID는 위 사용자 목록의 상세 정보에서 확인할 수 있습니다. 자기 계정 차단은 불가능합니다.</div>
 <input id="adminOpsTarget" placeholder="사용자 UID" style="width:100%;margin:6px 0"><input id="adminOpsReason" maxlength="120" placeholder="제재 사유" style="width:100%;margin:6px 0">
 <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="adminOpsDuration"><option value="600000">10분</option><option value="3600000">1시간</option><option value="86400000">1일</option><option value="604800000">7일</option><option value="0">영구</option></select><button id="adminOpsBan" type="button">🚫 차단</button><button id="adminOpsUnban" type="button">차단 해제</button><button id="adminOpsMute" type="button">🔇 채팅 금지</button><button id="adminOpsUnmute" type="button">채팅 금지 해제</button></div>
@@ -893,32 +893,24 @@ function bindAdminOps(){
  $('#adminOps')?.addEventListener('click',e=>{const b=e.target.closest('.adminOpsPickUser');if(b){$('#adminOpsTarget').value=b.dataset.uid;$('#adminOpsTarget').scrollIntoView({behavior:'smooth',block:'center'});}});
  on('adminOpsBan',()=>adminOpsAct('ban'));on('adminOpsUnban',()=>adminOpsAct('ban',true));
  on('adminOpsMute',()=>adminOpsAct('mute'));on('adminOpsUnmute',()=>adminOpsAct('mute',true));
+ on('adminOpsClearNotice',async()=>{await adminOpsAllowed();if(!confirm('현재 상단 공지를 내릴까요?'))return;await remove(ref(db,'arcadeAdminNotice'));adminOpsStatus('✅ 상단 공지를 내렸습니다.');});
  on('adminOpsClearLogs',async()=>{await adminOpsAllowed();if(!confirm('관리자 활동 기록을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;if(prompt('확인하려면 로그삭제를 입력하세요.')!=='로그삭제')return;await remove(ref(db,'adminLogs'));await adminOpsRefresh('refresh');adminOpsStatus('✅ 관리자 활동 기록 전체 삭제 완료');});
- on('adminOpsSendNotice',async()=>{await adminOpsAllowed();const message=$('#adminOpsNotice').value.trim();if(!message)throw Error('공지 내용을 입력하세요.');if(!confirm('전체 공지를 발송할까요?'))return;await set(ref(db,'arcadeAdminNotice'),{text:message,at:Date.now(),by:auth.currentUser.uid});await writeAdminLog('전체 공지 발송','arcadeAdminNotice',message);adminOpsStatus('✅ 공지 발송 완료 · 로비 상단과 전체채팅에 표시됩니다.');});
+ on('adminOpsSendNotice',async()=>{await adminOpsAllowed();const message=$('#adminOpsNotice').value.trim();if(!message)throw Error('공지 내용을 입력하세요.');if(!confirm('전체 공지를 발송할까요?'))return;await set(ref(db,'arcadeAdminNotice'),{text:message,at:Date.now(),by:auth.currentUser.uid});await push(ref(db,'globalChat'),{from:'admin-notice',name:'📢 관리자 공지',text:message,at:Date.now(),type:'notice'});await writeAdminLog('전체 공지 발송','arcadeAdminNotice',message);adminOpsStatus('✅ 공지 발송 완료 · 로비 상단과 전체채팅에 표시됩니다.');});
  $('#adminOpsRoomList')?.addEventListener('click',async e=>{const b=e.target.closest('.adminOpsDeleteRoom');if(!b)return;try{await adminOpsAllowed();const path=b.dataset.opsPath,id=b.dataset.opsId;if(!adminOpsSources.some(([p])=>p===path))throw Error('허용되지 않은 경로');if(!confirm(`${id} 방을 삭제할까요? 게임 중인 참가자도 영향을 받습니다.`))return;await remove(ref(db,`${path}/${id}`));await writeAdminLog('방 강제 삭제',`${path}/${id}`,'관리자 수동 삭제');await adminOpsRefresh()}catch(err){adminOpsStatus('오류: '+err.message)}});
 }
 bindAdminOps();
 
-// Live announcements: show the latest notice as a banner and in the global-chat log.
-// This listener is read-only for ordinary users; only the admin publish button writes.
+// Notices are stored as normal global-chat entries so chat clearing removes them.
 (function setupArcadeNotice(){
- const banner=document.createElement('div');banner.id='arcadeLiveNotice';
- banner.setAttribute('role','status');
- banner.style.cssText='display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:1000000;max-width:min(94vw,560px);width:max-content;box-sizing:border-box;padding:12px 16px;border-radius:12px;background:#163c64;color:white;box-shadow:0 5px 24px #0008;border:1px solid #8fcaff;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;';
+ const banner=document.createElement('div');banner.id='arcadeLiveNotice';banner.setAttribute('role','status');
+ banner.style.cssText='display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:1000000;max-width:min(94vw,560px);box-sizing:border-box;padding:12px 16px;border-radius:12px;background:#163c64;color:white;box-shadow:0 5px 24px #0008;border:1px solid #8fcaff;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;';
  document.body.appendChild(banner);
- let seenAt=null;
  onValue(ref(db,'arcadeAdminNotice'),snap=>{
   const v=snap.val();if(!v||!v.text){banner.style.display='none';return;}
-  const at=Number(v.at||0),message=String(v.text).slice(0,160);
-  banner.textContent='📢 관리자 공지: '+message;
+  banner.textContent='📢 관리자 공지: '+String(v.text).slice(0,160);
   banner.style.display='block';
-  if(seenAt===null){seenAt=at;return;}
-  if(at===seenAt)return;
-  seenAt=at;
-  const log=document.getElementById('globalChatLog');
-  if(log){const row=document.createElement('div');row.className='chatMsg';row.style.cssText='border:1px solid #8fcaff;background:#193d60;padding:8px;border-radius:8px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere;';row.textContent='📢 [관리자 공지] '+message;log.appendChild(row);log.scrollTop=log.scrollHeight;}
  },err=>console.warn('공지 수신 실패',err));
-})();
+})();;
 
 // Ban gate for the main arcade client. Firebase rules must independently enforce bans.
 let arcadeBanActive=false;
@@ -941,13 +933,13 @@ async function openAdmin(user){
  show('adminPanel');
  $('#adminWho').textContent='🛡️ 관리자 인증됨 · '+(user.email||'Google 계정');
  $('#adminStatus').textContent='✅ 관리자 권한 활성화 · 내 계정 포함 전체 플레이어 관리 가능';
- await renderAdminUsers();
- await renderAdminGlobalChat();
- adminOpsRefresh().catch(e=>adminOpsStatus("통계 조회 오류: "+e.message));
+ renderAdminUsers().catch(console.error);
+ renderAdminGlobalChat().catch(console.error);
+ // Large multi-game scans run only when the operator requests refresh/inspection.
+ adminOpsStatus('통계와 방 목록은 새로고침을 누르면 조회합니다.');
  if(adminPresenceUnsub)adminPresenceUnsub();
  if(adminUsersUnsub)adminUsersUnsub();
- adminPresenceUnsub=onValue(ref(db,'presence'),()=>{if(!$('#adminPanel').classList.contains('hidden'))renderAdminUsers().catch(console.error)});
- adminUsersUnsub=onValue(ref(db,'users'),()=>{if(!$('#adminPanel').classList.contains('hidden'))renderAdminUsers().catch(console.error)});
+ let adminRenderTimer;const scheduleAdminUsers=()=>{if($('#adminPanel').classList.contains('hidden'))return;clearTimeout(adminRenderTimer);adminRenderTimer=setTimeout(()=>renderAdminUsers().catch(console.error),700)}; adminPresenceUnsub=onValue(ref(db,'presence'),scheduleAdminUsers); adminUsersUnsub=onValue(ref(db,'users'),scheduleAdminUsers);
  if(adminChatUnsub)adminChatUnsub();
  adminChatUnsub=onValue(query(ref(db,'globalChat'),limitToLast(100)),()=>{if(!$('#adminPanel').classList.contains('hidden'))renderAdminGlobalChat().catch(console.error)});
  if(adminPlayerLogsUnsub)adminPlayerLogsUnsub();
