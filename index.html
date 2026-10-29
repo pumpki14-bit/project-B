@@ -498,7 +498,7 @@ button{-webkit-appearance:none;appearance:none;cursor:pointer}
 <button class="secondary" id="mileageShopBack" style="width:100%;margin-top:12px">캡슐로 돌아가기</button></section>
 <section class="card hidden" id="history"><h1>📜 최근 전적</h1><div id="historyList"></div><button class="secondary" id="historyBack" style="width:100%;margin-top:12px">돌아가기</button></section>
 <section class="card hidden" id="missions"><h1>🎯 일일 미션</h1><div id="missionList"></div><button class="secondary" id="missionsBack" style="width:100%;margin-top:12px">돌아가기</button></section>
-<section class="card hidden" id="adminPanel"><h1>🛡️ 관리자 패널</h1>
+<section class="card hidden" id="adminPanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>🛡️ 관리자 패널</h1><button class="secondary" id="arcAdminClose" type="button" style="width:auto;min-height:34px;padding:5px 10px">✕ 닫기</button></div>
 <p class="muted" id="adminWho"></p>
 <div class="notice" id="adminStatus">관리자 인증 확인 중...</div>
 <input class="adminSearch" id="adminSearch" placeholder="🔎 닉네임 검색"/><button class="secondary" id="adminAllLogsBtn" style="width:100%;margin:8px 0" type="button">📚 모든 플레이어 로그</button>
@@ -723,7 +723,9 @@ async function renderAdminUsers(){
    <div class="friendMain"><b>${escAdmin(p.name||'플레이어')}${me}</b>
    <div class="muted">${status} · ⭐ ${Math.round(Number(p.rating??1000))} · ${p.wins||0}승 ${p.losses||0}패 ${p.draws||0}무 · 🪙 ${Number(p.coins??1000).toLocaleString()} · 🎟️ ${Number(p.mileage||0).toLocaleString()}</div></div>
    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
-    <button class="adminPlayerLog secondary" data-uid="${escAdmin(id)}" type="button">📋 로그</button> ${playing?`<button class="adminWatch secondary" data-room="${escAdmin(pr.room)}" type="button">👁️ 관전</button>`:''}
+    <button class="adminPlayerLog secondary" data-uid="${escAdmin(id)}" type="button">📋 로그</button>
+    <button class="adminRename secondary" data-uid="${escAdmin(id)}" type="button">✏️ 이름 변경</button>
+    <button class="adminNameLock secondary" data-uid="${escAdmin(id)}" data-locked="${p.nameLocked?'1':'0'}" type="button">${p.nameLocked?'🔒 이름 고정 해제':'🔓 이름 고정'}</button> ${playing?`<button class="adminWatch secondary" data-room="${escAdmin(pr.room)}" type="button">👁️ 관전</button>`:''}
     <select class="adminGrantType" style="flex:1;min-width:150px">
       <option value="coin">🪙 코인</option>
       <option value="mileage">🎟️ 마일리지</option>
@@ -782,6 +784,22 @@ async function renderAdminUsers(){
     await writeAdminLog('아이템 회수',uid,decodeURIComponent(item)+' × '+amount);await logPlayerAction(uid,'관리자 회수',`${decodeURIComponent(item)} × -${amount}`);alert(`🎁 아이템 ${amount.toLocaleString()}개를 회수했습니다.`);
    }
    await renderAdminUsers();
+ }));
+ document.querySelectorAll('.adminRename').forEach(btn=>btn.addEventListener('click',async()=>{
+  if(!(await isAdminUser(auth.currentUser)))return alert('관리자만 사용할 수 있습니다.');
+  const uid=btn.dataset.uid;const snap=await get(ref(db,'users/'+uid));const old=String(snap.val()?.name||'플레이어');
+  const entered=prompt('변경할 플레이어 이름 (최대 12자)',old);if(entered===null)return;
+  const name=entered.trim();if(!name||name.length>12||arcadeForbiddenName(name))return alert('사용할 수 없는 이름입니다. (1~12자, 금지어 제외)');
+  if(!confirm(`이름을 ${old} → ${name}(으)로 변경할까요?`))return;
+  try{await update(ref(db,'users/'+uid),{name});await writeAdminLog('닉네임 강제 변경',uid,old+' → '+name);await renderAdminUsers();}
+  catch(e){alert('변경 실패: '+(e.code||e.message));}
+ }));
+ document.querySelectorAll('.adminNameLock').forEach(btn=>btn.addEventListener('click',async()=>{
+  if(!(await isAdminUser(auth.currentUser)))return alert('관리자만 사용할 수 있습니다.');
+  const uid=btn.dataset.uid;const locked=btn.dataset.locked==='1';
+  if(!confirm(locked?'이 플레이어의 이름 고정을 해제할까요?':'이 플레이어가 자신의 이름을 변경하지 못하도록 고정할까요?'))return;
+  try{await update(ref(db,'users/'+uid),{nameLocked:!locked});await writeAdminLog(locked?'닉네임 고정 해제':'닉네임 고정',uid);await renderAdminUsers();}
+  catch(e){alert('설정 실패: '+(e.code||e.message));}
  }));
  document.querySelectorAll('.adminPlayerLog').forEach(btn=>btn.addEventListener('click',()=>openPlayerInfo(btn.dataset.uid)));
  document.querySelectorAll('.adminWatch').forEach(btn=>btn.addEventListener('click',async()=>{
@@ -929,7 +947,7 @@ async function openAdmin(user){
   return;
  }
  adminAuthChecked=true;
- $('#adminLogin').textContent='🛡️ 관리자 패널';$('#arcChatAdmin').style.display='inline-flex';
+ $('#adminLogin').textContent='🛡️ 관리자 패널';$('#arcChatAdmin').style.display='inline-flex';if($('#arcChatTopAdmin'))$('#arcChatTopAdmin').style.display='inline-flex';
  show('adminPanel');
  $('#adminWho').textContent='🛡️ 관리자 인증됨 · '+(user.email||'Google 계정');
  $('#adminStatus').textContent='✅ 관리자 권한 활성화 · 내 계정 포함 전체 플레이어 관리 가능';
@@ -947,14 +965,14 @@ async function openAdmin(user){
 }
 getRedirectResult(auth).then(async r=>{
  if(r?.user){
-  const ok=await isAdminUser(r.user);adminAuthChecked=ok;$('#arcChatAdmin').style.display=ok?'inline-flex':'none';
+  const ok=await isAdminUser(r.user);adminAuthChecked=ok;$('#arcChatAdmin').style.display=ok?'inline-flex':'none';if($('#arcChatTopAdmin'))$('#arcChatTopAdmin').style.display=ok?'inline-flex':'none';
   $('#adminLogin').textContent=ok?'🛡️ 관리자 패널 · 인증됨':'⚠️ 로그인됨 · 관리자 UID 확인';
   if(ok)alert('🛡️ 관리자 인증 완료. 관리자 패널 버튼을 눌러서 들어갈 수 있습니다.');
  }
 }).catch(e=>{console.error('redirect result',e);alert('로그인 복귀 처리 실패: '+(e?.code||e?.message||String(e)))});
 onAuthStateChanged(auth,async user=>{
- if(!user){adminAuthChecked=false;$('#arcChatAdmin').style.display='none';$('#adminLogin').textContent='🔐 관리자 로그인';return}
- const ok=await isAdminUser(user);adminAuthChecked=ok;$('#arcChatAdmin').style.display=ok?'inline-flex':'none';
+ if(!user){adminAuthChecked=false;$('#arcChatAdmin').style.display='none';if($('#arcChatTopAdmin'))$('#arcChatTopAdmin').style.display='none';$('#adminLogin').textContent='🔐 관리자 로그인';return}
+ const ok=await isAdminUser(user);adminAuthChecked=ok;$('#arcChatAdmin').style.display=ok?'inline-flex':'none';if($('#arcChatTopAdmin'))$('#arcChatTopAdmin').style.display=ok?'inline-flex':'none';
  $('#adminLogin').textContent=ok?'🛡️ 관리자 패널 · 인증됨':'⚠️ 로그인됨 · 관리자 UID 확인';
 });
 
@@ -1184,7 +1202,7 @@ function listenOutgoingChallenges(){
     }
   })
 }
-async function ensureProfile(){const r=ref(db,'users/'+myId);await runTransaction(r,p=>{p=p||{wins:0,losses:0,draws:0,games:0,rating:1000,createdAt:Date.now()};if(p.rating==null)p.rating=1000;p.name=nick();p.lastSeen=Date.now();return p});if(profileUnsub)profileUnsub();profileUnsub=onValue(r,s=>{const p=s.val()||{};const g=p.games||0,w=p.wins||0;$('#homeRecord').textContent=`${w}승 ${p.losses||0}패 ${p.draws||0}무`;$('#homeRate').textContent=`승률 ${g?Math.round(w/g*100):0}%`;renderAccount(p)})}initSocial().catch(e=>{console.error(e);msg('friendMsg','친구 기능 연결 중 오류가 발생했습니다. Firebase Rules를 확인해주세요.')});
+async function ensureProfile(){const r=ref(db,'users/'+myId);await runTransaction(r,p=>{p=p||{wins:0,losses:0,draws:0,games:0,rating:1000,createdAt:Date.now()};if(p.rating==null)p.rating=1000;p.name=nick();p.lastSeen=Date.now();return p});if(profileUnsub)profileUnsub();profileUnsub=onValue(r,s=>{const p=s.val()||{};if(p.name){localStorage.setItem('omokNick',p.name);$('#nick').value=p.name;try{const shared=JSON.parse(localStorage.getItem('arcade_shared_profile')||'{}');if(shared.name!==p.name){shared.name=p.name;localStorage.setItem('arcade_shared_profile',JSON.stringify(shared));}}catch(e){}}if($('#profileName')&&$('#profileEditor')&&!$('#profileEditor').classList.contains('hidden')){$('#profileName').value=p.name||'';$('#profileName').readOnly=!!p.nameLocked;$('#profileName').title=p.nameLocked?'관리자가 닉네임을 고정했습니다.':'';}const g=p.games||0,w=p.wins||0;$('#homeRecord').textContent=`${w}승 ${p.losses||0}패 ${p.draws||0}무`;$('#homeRate').textContent=`승률 ${g?Math.round(w/g*100):0}%`;renderAccount(p)})}initSocial().catch(e=>{console.error(e);msg('friendMsg','친구 기능 연결 중 오류가 발생했습니다. Firebase Rules를 확인해주세요.')});
 ensureProfile().catch(e=>{console.error(e);msg('homeMsg','전적 정보를 불러오지 못했습니다.')});
 listenOutgoingChallenges();
 
@@ -1446,6 +1464,7 @@ function arcadeForbiddenName(value){
 async function saveAccount(){
  const name=$('#profileName').value.trim().slice(0,12)||'플레이어';
  if(arcadeForbiddenName(name)){alert('사용할 수 없는 단어가 포함되어 있습니다.');$('#profileName').focus();return;}
+ const serverProfile=(await get(ref(db,'users/'+myId))).val()||{};if(serverProfile.nameLocked&&name!==serverProfile.name){alert('관리자가 닉네임을 고정했습니다. 이름을 변경할 수 없습니다.');$('#profileName').value=serverProfile.name||name;return;}
  const bio=$('#profileBio').value.trim().slice(0,100),title=$('#titleSelect').value,frame=$('#frameSelect').value||'',stoneSkin=$('#stoneSelect').value||'',placeFx=$('#placeFxSelect').value||'',placeSound=$('#placeSoundSelect').value||'',winFx=$('#winFxSelect').value||'',avatar='🙂',photo=$('#profileEditor').dataset.photo||'';
  localStorage.setItem('omokNick',name);localStorage.setItem('arcade_shared_profile',JSON.stringify({name,photo}));$('#nick').value=name;
  try{
@@ -2193,7 +2212,7 @@ $('#rejectChallenge').addEventListener('click',rejectChallenge);
 
 pending=null;state=null;roomId=null;myColor=0;aiMode=false;let spectatorMode=false;show('lobby');
 $('#goPvp').addEventListener('click',()=>{aiMode=false;show('home')});
-$('#openRanking').addEventListener('click',openRanking);$('#rankingBack').addEventListener('click',()=>{if(rankingUnsub){rankingUnsub();rankingUnsub=null}show('lobby')});$('#adminLogin').addEventListener('click',adminLogin);$('#arcChatAdmin').addEventListener('click',()=>{if(adminAuthChecked)adminLogin();});$('#adminBack').addEventListener('click',()=>show('lobby'));
+$('#openRanking').addEventListener('click',openRanking);$('#rankingBack').addEventListener('click',()=>{if(rankingUnsub){rankingUnsub();rankingUnsub=null}show('lobby')});$('#adminLogin').addEventListener('click',adminLogin);$('#arcChatAdmin').addEventListener('click',()=>{if(adminAuthChecked)adminLogin();});$('#arcChatTopAdmin')?.addEventListener('click',()=>{if(adminAuthChecked)adminLogin();});$('#adminBack').addEventListener('click',()=>show('lobby'));$('#arcAdminClose')?.addEventListener('click',()=>show('lobby'));
 $('#watchBtn').addEventListener('click',()=>{$('#watchBox').classList.toggle('hidden')});
 $('#watchJoin').addEventListener('click',()=>watchRoom($('#watchCodeInput').value));
 
@@ -2277,7 +2296,7 @@ $('#closeAchievements').addEventListener('click',()=>$('#achievementModal').clas
 $('#achievementModal').addEventListener('click',e=>{if(e.target.id==='achievementModal')e.currentTarget.classList.add('hidden')});
 $('#editProfile').addEventListener('click',()=>{$('#profileEditor').classList.remove('arc-omok-profile');$('#profileEditor').classList.add('arc-shared-profile');$('#profileEditor h1').textContent='게임룸 프로필 수정';$('#profileName').value=myProfile.name||nick();$('#profileBio').value=myProfile.bio||'';$('#profileEditor').dataset.photo=myProfile.photo||'';$('#profilePreview').innerHTML=myProfile.photo?`<img src="${myProfile.photo}" style="width:100%;height:100%;object-fit:cover">`:'🙂';renderAccount(myProfile);show('profileEditor')});
 $('#closeProfile').addEventListener('click',()=>show('lobby'));
-$('#saveProfile').addEventListener('click',saveAccount);
+$('#saveProfile').addEventListener('click',saveAccount);$('#profileEditor')?.addEventListener('focusin',()=>{if(myProfile?.nameLocked){$('#profileName').readOnly=true;$('#profileName').title='관리자가 닉네임을 고정했습니다.';}});
 $('#profileImageInput').addEventListener('change',e=>{const file=e.target.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){alert('이미지 파일을 선택해주세요.');return}const reader=new FileReader();reader.onload=()=>{const im=new Image();im.onload=()=>{const size=Math.min(im.width,im.height),sx=(im.width-size)/2,sy=(im.height-size)/2,cv=document.createElement('canvas');cv.width=cv.height=256;cv.getContext('2d').drawImage(im,sx,sy,size,size,0,0,256,256);const data=cv.toDataURL('image/jpeg',.72);$('#profileEditor').dataset.photo=data;$('#profilePreview').innerHTML=`<img src="${data}" style="width:100%;height:100%;object-fit:cover">`};im.src=reader.result};reader.readAsDataURL(file)});
 $('#removeProfileImage').addEventListener('click',()=>{$('#profileEditor').dataset.photo='';$('#profilePreview').textContent='🙂';$('#profileImageInput').value=''});
 
@@ -2458,12 +2477,12 @@ enforce();
 #arcadeActivityToast .arcadeToast{background:linear-gradient(115deg,#122a47f7,#233c65f7);color:#fff;border:1px solid #91b8ff;border-radius:14px;padding:13px 16px;box-shadow:0 8px 30px #0009;font-size:14px;line-height:1.45;font-weight:750;word-break:keep-all;animation:arcadeToastIn .22s ease-out}
 #arcadeActivityToast .arcadeToast strong{color:#ffe69d}@keyframes arcadeToastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
 </style><div id="arcadeActivityToast" role="status" aria-live="polite"></div>
-<div id="arcEverywhereChat">
+<style id="arcAdminTopStyle">#arcChatTopActions{display:flex;align-items:center;justify-content:flex-end;gap:5px;width:100%;pointer-events:auto}#arcChatTopAdmin{width:28px!important;min-width:28px!important;height:27px!important;min-height:27px!important;padding:2px!important;font-size:12px!important;border-radius:7px!important;background:#263753!important;color:#fff!important;border:1px solid #53627c!important;cursor:pointer!important}#arcChatToggle{margin-left:0!important}#arcEverywhereChat #arcChatTopActions{order:0}#arcEverywhereChat #arcChatWindow{order:1}</style><div id="arcEverywhereChat">
 <div id="arcChatWindow"><div id="arcChatWindowHeader"><span>💬 전체 채팅</span><button type="button" id="arcChatClear">기록 지우기</button></div>
 <div id="arcChatMessages" aria-live="polite"></div>
 <form id="arcChatForm"><input id="arcChatText" maxlength="100" autocomplete="off" placeholder="전체 채팅 메시지" aria-label="전체 채팅 메시지"><button id="arcChatSubmit" type="submit">전송</button></form>
 <div id="arcChatError"></div></div>
-<button id="arcChatToggle" type="button">💬 채팅</button></div><script type="module" id="arcadeActivityListener">
+<div id="arcChatTopActions"><button id="arcChatTopAdmin" type="button" title="관리자 패널" aria-label="관리자 패널" style="display:none">🛡️</button><button id="arcChatToggle" type="button">💬 채팅</button></div></div><script type="module" id="arcadeActivityListener">
 import {getApps,initializeApp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {getDatabase,ref,onValue,query,limitToLast,push} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 const cfg={apiKey:'AIzaSyBaiY8zg-Gt6sUzCE66RKDJyNBATi-wS-k',authDomain:'omok-7642e.firebaseapp.com',databaseURL:'https://omok-7642e-default-rtdb.asia-southeast1.firebasedatabase.app/',projectId:'omok-7642e'};
