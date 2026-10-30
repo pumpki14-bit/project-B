@@ -601,7 +601,7 @@ if($('#missionsBack'))$('#missionsBack').onclick=()=>show('lobby');
 </script>
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
-import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,setPersistence,browserLocalPersistence,signOut,signInAnonymously} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 import {getDatabase,ref,set,get,update,onValue,runTransaction,remove,onDisconnect,push,query,limitToLast} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js';
 const firebaseConfig={apiKey:'AIzaSyBaiY8zg-Gt6sUzCE66RKDJyNBATi-wS-k',authDomain:'omok-7642e.firebaseapp.com',databaseURL:'https://omok-7642e-default-rtdb.asia-southeast1.firebasedatabase.app/',projectId:'omok-7642e',storageBucket:'omok-7642e.firebasestorage.app',messagingSenderId:'469622813122',appId:'1:469622813122:web:43e75c885d3b475dfde65b'};
 const app=initializeApp(firebaseConfig),db=getDatabase(app),auth=getAuth(app),googleProvider=new GoogleAuthProvider(),$=s=>document.querySelector(s);document.getElementById('jsStatus').textContent='정상';document.addEventListener('touchstart',()=>{}, {passive:true});const N=15,P=30,S=(640-P*2)/(N-1),dirs=[[1,0],[0,1],[1,1],[1,-1]];
@@ -616,6 +616,18 @@ function friendCodeFor(id){let h=2166136261;for(const ch of id){h^=ch.charCodeAt
 
 let adminAuthChecked=false,adminPresenceUnsub=null,adminUsersUnsub=null,adminChatUnsub=null,adminPlayerLogsUnsub=null;
 setPersistence(auth,browserLocalPersistence).catch(e=>console.error('auth persistence',e));
+// Restore multiplayer sessions with Firebase anonymous authentication.
+// Keep Google sessions intact for admins.
+onAuthStateChanged(auth,async user=>{
+ if(user)return;
+ if(sessionStorage.getItem('omokAdminLoginPending')==='1')return;
+ try{await signInAnonymously(auth)}
+ catch(e){console.error('multiplayer anonymous auth failed',e);
+  const status=document.querySelector('#arcOnlineCount');
+  if(status)status.title='Firebase 익명 인증 오류: '+(e.code||e.message);
+ }
+});
+
 
 async function isAdminUser(user){
  if(!user)return false;
@@ -629,24 +641,34 @@ async function isAdminUser(user){
  setTimeout(()=>applyChromaVar(document),0);
 }
 async function adminLogin(){
+ const btn=$('#adminLogin');
  try{
+  if(btn)btn.disabled=true;
   await setPersistence(auth,browserLocalPersistence);
-  if(auth.currentUser){
-   if(await isAdminUser(auth.currentUser)){await openAdmin(auth.currentUser);return}
-   alert('로그인은 되어 있지만 관리자 UID가 일치하지 않습니다.\n현재 로그인 UID: '+auth.currentUser.uid);
+  if(auth.currentUser && await isAdminUser(auth.currentUser)){
+   await openAdmin(auth.currentUser);return;
+  }
+  // A signed-in non-admin account must not permanently block switching accounts.
+  sessionStorage.setItem('omokAdminLoginPending','1');
+  if(auth.currentUser)await signOut(auth);
+  googleProvider.setCustomParameters({prompt:'select_account'});
+  // Mobile WebView and popup-blocked browsers require a full-page redirect.
+  const mobileWebView=/; wv\)|\bwv\b|WebView/i.test(navigator.userAgent);
+  if(mobileWebView){
+   sessionStorage.setItem('omokAdminLoginPending','1');
+   await signInWithRedirect(auth,googleProvider);
    return;
   }
   try{
    const result=await signInWithPopup(auth,googleProvider);
    if(result?.user){
-    if(await isAdminUser(result.user)){
-     await openAdmin(result.user);
-     alert('🛡️ 관리자 인증 완료');
-    }else alert('Google 로그인은 성공했지만 관리자 UID가 일치하지 않습니다.\n현재 로그인 UID: '+result.user.uid);
+    if(await isAdminUser(result.user)){await openAdmin(result.user);alert('🛡️ 관리자 인증 완료');}
+    else alert('로그인은 성공했지만 관리자 권한이 등록되지 않았습니다.\n로그인 UID: '+result.user.uid+'\nFirebase admins/'+result.user.uid+' 값을 확인하세요.');
    }
   }catch(e){
    const c=String(e?.code||'');
-   if(c.includes('popup-blocked')||c.includes('operation-not-supported-in-this-environment')){
+   if(['popup-blocked','popup-closed-by-user','operation-not-supported-in-this-environment','cancelled-popup-request'].some(x=>c.includes(x))){
+    if(c.includes('popup-closed-by-user'))return;
     sessionStorage.setItem('omokAdminLoginPending','1');
     await signInWithRedirect(auth,googleProvider);
     return;
@@ -656,7 +678,7 @@ async function adminLogin(){
  }catch(e){
   console.error('admin login',e);
   alert('관리자 로그인 실패: '+(e?.code||e?.message||String(e)));
- }
+ }finally{sessionStorage.removeItem('omokAdminLoginPending');if(btn)btn.disabled=false;}
 }
 function chromaHueFor(s=''){
  let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;
@@ -1035,9 +1057,11 @@ async function openAdmin(user){
 }
 getRedirectResult(auth).then(async r=>{
  if(r?.user){
+  sessionStorage.removeItem('omokAdminLoginPending');
   const ok=await isAdminUser(r.user);adminAuthChecked=ok;$('#arcChatAdmin').style.display=ok?'inline-flex':'none';if($('#arcChatTopAdmin'))$('#arcChatTopAdmin').style.display=ok?'inline-flex':'none';
   $('#adminLogin').textContent=ok?'🛡️ 관리자 패널 · 인증됨':'⚠️ 로그인됨 · 관리자 UID 확인';
   if(ok)alert('🛡️ 관리자 인증 완료. 관리자 패널 버튼을 눌러서 들어갈 수 있습니다.');
+  else alert('로그인은 성공했지만 관리자 권한이 없습니다. Firebase admins/'+r.user.uid+' 값을 확인하세요.');
  }
 }).catch(e=>{console.error('redirect result',e);alert('로그인 복귀 처리 실패: '+(e?.code||e?.message||String(e)))});
 onAuthStateChanged(auth,async user=>{
@@ -2905,4 +2929,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  if(admin)observer.observe(admin,{attributes:true,attributeFilter:['class']});
 });
 </script>
+
+<!-- GameLounge visible build version -->
+<div id="gl-build-version" aria-label="게임라운지 버전 1.0.0" style="position:fixed;top:calc(env(safe-area-inset-top, 0px) + 3px);right:5px;z-index:2147483647;pointer-events:none;padding:2px 5px;border-radius:5px;background:rgba(20,25,35,.52);color:#f4f4f4;font:10px/1.2 Arial,sans-serif;letter-spacing:.1px;opacity:.78">ver. 1.0.2</div>
 </body></html>
