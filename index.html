@@ -2240,7 +2240,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       if (data.presence) {
         const seenUids = new Set();
         Object.values(data.presence).forEach(u => {
-          if (u && u.uid && u.uid !== profile.uid && nowTs - (u.lastSeen || 0) < 35000) {
+          if (u && u.uid && u.uid !== profile.uid && Math.abs(nowTs - (u.lastSeen || 0)) < 120000) {
             seenUids.add(u.uid);
             if (!onlineUsersMap.has(u.uid)) changed = true;
             onlineUsersMap.set(u.uid, { ...u, status: "online", isReal: true });
@@ -2320,6 +2320,53 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     } catch (e) { showFirebaseStatus('offline'); }
   }
 
+  // Dedicated lightweight presence sync: independent of room/chat reads.
+  let presenceReadBusy = false;
+  let presenceLastError = "";
+  async function pollOnlinePresence() {
+    if (presenceReadBusy) return;
+    presenceReadBusy = true;
+    try {
+      const token = await ensureRiftAuth();
+      const response = await fetch(riftDbEndpoint("presence", token) + "&_t=" + Date.now(), {cache:"no-store"});
+      if (!response.ok) throw new Error("PRESENCE_READ_HTTP_" + response.status);
+      const users = (await response.json()) || {};
+      const now = Date.now();
+      const seen = new Set();
+      let changed = false;
+      for (const [key, raw] of Object.entries(users)) {
+        if (!raw || typeof raw !== "object") continue;
+        const uid = String(raw.uid || key);
+        if (uid === String(profile.uid)) continue;
+        const ts = Number(raw.lastSeen) || 0;
+        // Allow moderate clock skew between phones, but discard stale records.
+        if (!ts || Math.abs(now - ts) > 120000) continue;
+        seen.add(uid);
+        const old = onlineUsersMap.get(uid);
+        if (!old || old.name !== raw.name || old.lastSeen !== ts) changed = true;
+        onlineUsersMap.set(uid, {...raw, uid, isReal:true, fromFb:true, status:"online"});
+      }
+      for (const [uid, user] of onlineUsersMap) {
+        if (user.fromFb && !seen.has(uid)) {
+          onlineUsersMap.delete(uid);
+          changed = true;
+        }
+      }
+      presenceLastError = "";
+      if (changed) {
+        refreshSocialDomOnly();
+        if (currentScreenIdx === 0 && !$("socialHubSection")) riftLobby();
+      }
+    } catch (err) {
+      presenceLastError = String(err.message || err);
+      console.warn("Presence sync failed:", err);
+    } finally {
+      presenceReadBusy = false;
+    }
+  }
+  setInterval(pollOnlinePresence, 3000);
+  setTimeout(pollOnlinePresence, 900);
+
   function broadcastEvent(type, payload) {
     try {
       if (bcChannel) bcChannel.postMessage({ type, payload, senderUid: profile.uid });
@@ -2388,7 +2435,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
   function syncOnlineNow() {
     const nowTs = Date.now();
     for (const [k, u] of [...onlineUsersMap.entries()]) {
-      if (nowTs - (u.lastSeen || 0) > 35000) {
+      if (Math.abs(nowTs - (u.lastSeen || 0)) > 120000) {
         onlineUsersMap.delete(k);
       }
     }
