@@ -2169,11 +2169,53 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     return (profile.firebaseDbUrl || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
   }
 
+  // Firebase Identity Toolkit anonymous auth. Tokens are local to each browser.
+  const RIFT_FIREBASE_API_KEY = "AIzaSyCqPLMUysulHUd39lqsAAz7V6MxSXFPjuU";
+  const RIFT_AUTH_STORAGE = "lucky_rift_firebase_auth_global_b299e";
+  let riftAuth = null;
+  let riftAuthPromise = null;
+  try { riftAuth = JSON.parse(localStorage.getItem(RIFT_AUTH_STORAGE) || 'null'); } catch (_) {}
+  async function ensureRiftAuth() {
+    if (riftAuth && Date.now() < riftAuth.expiresAt - 60000) return riftAuth.idToken;
+    if (riftAuthPromise) return riftAuthPromise;
+    riftAuthPromise = (async () => {
+      try {
+        let endpoint, payload;
+        if (riftAuth?.refreshToken) {
+          endpoint = `https://securetoken.googleapis.com/v1/token?key=${RIFT_FIREBASE_API_KEY}`;
+          payload = { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({grant_type:'refresh_token',refresh_token:riftAuth.refreshToken}) };
+        } else {
+          endpoint = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${RIFT_FIREBASE_API_KEY}`;
+          payload = { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({returnSecureToken:true}) };
+        }
+        let response = await fetch(endpoint, payload);
+        if (!response.ok && riftAuth?.refreshToken) {
+          localStorage.removeItem(RIFT_AUTH_STORAGE);
+          riftAuth = null;
+          response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${RIFT_FIREBASE_API_KEY}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({returnSecureToken:true})});
+        }
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || `AUTH_HTTP_${response.status}`);
+        riftAuth = {idToken:result.id_token || result.idToken, refreshToken:result.refresh_token || result.refreshToken, uid:result.user_id || result.localId, expiresAt:Date.now()+Number(result.expires_in || result.expiresIn || 3600)*1000};
+        localStorage.setItem(RIFT_AUTH_STORAGE, JSON.stringify(riftAuth));
+        return riftAuth.idToken;
+      } catch(e) { showFirebaseStatus('denied'); console.error('Firebase anonymous sign-in failed:',e); throw e; }
+      finally { riftAuthPromise = null; }
+    })();
+    return riftAuthPromise;
+  }
+  function riftDbEndpoint(path, token) {
+    return `https://${getCleanFbHost()}/luckyRift/${path}.json?auth=${encodeURIComponent(token)}`;
+  }
+  // Establish auth on page entry, not only when opening multiplayer UI.
+  ensureRiftAuth().then(() => firebasePoll()).catch(() => {});
+
   async function firebasePush(pathStr, dataObj) {
     const dbUrl = getCleanFbHost();
     if (!dbUrl) return;
     try {
-      const response = await fetch(`https://${dbUrl}/luckyRift/${pathStr}.json`, {
+      const token = await ensureRiftAuth();
+      const response = await fetch(riftDbEndpoint(pathStr, token), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataObj)
@@ -2187,7 +2229,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     const dbUrl = getCleanFbHost();
     if (!dbUrl) return;
     try {
-      const res = await fetch(`https://${dbUrl}/luckyRift.json`);
+      const token = await ensureRiftAuth();
+      const res = await fetch(riftDbEndpoint('', token));
       if (!res.ok) { showFirebaseStatus(res.status === 401 || res.status === 403 ? 'denied' : 'offline'); return; }
       showFirebaseStatus('online');
       const data = await res.json();
