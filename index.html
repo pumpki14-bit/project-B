@@ -411,9 +411,9 @@ skills[MAGE]=['연쇄 번개',18,'2초간 모든 적에게 0.4초마다 평타 2
 skills[LUMI]=['백룡 선회',23,'백룡이 몬스터 경로를 두 바퀴 돌며 접촉한 적에게 매 바퀴 평타 10배 피해'];
 profile.levels[LUMI]??=1;profile.stars[LUMI]??=0;profile.shards[LUMI]??=0;
 const selectLumi=$('cheatCharacter');selectLumi.insertAdjacentHTML('beforeend',`<option value="${LUMI}">초월 · 백룡의 루미</option>`);
-let whiteDragon=null,giantArrows=[];
+let whiteDragon=null, whiteDragons=[],giantArrows=[];
 const dragonBaseStart=start;
-start=function(){whiteDragon=null;giantArrows=[];dragonBaseStart()};$('start').onclick=start;
+start=function(){whiteDragon=null;whiteDragons=[];giantArrows=[];dragonBaseStart()};$('start').onclick=start;
 const lumiImage=new Image(),dragonSheet=new Image();
 lumiImage.src=ASSETS['assets/lumi.png'];dragonSheet.src=ASSETS['assets/white-dragon.png'];
 function lumiArt(c,x,y,size=78,pose=0,t=0,cast=0){
@@ -440,12 +440,12 @@ tick=function(dt){
     if(u.skillTimer<=0&&b.enemies.length){u.skillTimer=skills[ARCHER][1];u.volley=3;u.volleyWait=0;u.castLeft=.7}
     if(u.volley>0){u.volleyWait-=dt;if(u.volleyWait<=0){u.volley--;u.volleyWait=1;u.attack=.3;const target=b.enemies.slice().sort((a,z)=>z.p-a.p)[0];if(target){const p=path(target.p),from=cells[u.cell];giantArrows.push({bi,fromX:from.x,fromY:from.y-12,x:p.x,y:p.y,age:0,targetP:target.p});pop(bi,from.x,from.y-42,`${3-u.volley}/3 거목 화살!`,'#d7ff8e')}}}
    }
-   if(u.t===LUMI){u.skillTimer=(u.skillTimer??23)-dt;if(u.skillTimer<=0){u.skillTimer=23;u.castLeft=.8;u.attack=.3;whiteDragon={bi,p:0,lap:0,hits:new Set(),owner:u.id};pop(bi,cells[u.cell].x,cells[u.cell].y-45,'백룡 선회 · 두 바퀴!','#fff5c7')}}
+   if(u.t===LUMI){u.skillTimer=(u.skillTimer??23)-dt;if(u.skillTimer<=0){u.skillTimer=23;u.castLeft=.8;u.attack=.3;whiteDragons.push({bi,p:0,lap:0,hits:new Set(),dotQueue:[],owner:u.id});pop(bi,cells[u.cell].x,cells[u.cell].y-45,'백룡 선회 · 두 바퀴!','#fff5c7')}}
   }
  }
  for(const a of giantArrows){a.age+=dt;if(a.age>=.42&&!a.hit){a.hit=true;const b=boards[a.bi];const source=b.units.find(u=>u.t===ARCHER);if(source)for(const e of b.enemies){const p=path(e.p);if(Math.hypot(p.x-a.x,p.y-a.y)<95||Math.abs(e.p-a.targetP)<100){e.hp-=damage(source,b)*10;e.root=Math.max(e.root||0,2);e.hurt=.25;spark(a.bi,p.x,p.y,'#dcffab',14)}}}}
  giantArrows=giantArrows.filter(a=>a.age<.9);
- if(whiteDragon){const d=whiteDragon,b=boards[d.bi],source=b?.units.find(u=>u.id===d.owner);if(!source){whiteDragon=null}else{const before=d.p;d.p+=perimeter/6*dt;const lap=Math.floor(d.p/perimeter);if(lap!==d.lap){d.lap=lap;d.hits.clear()}if(d.p>=perimeter*2){whiteDragon=null}else{const head=path(d.p);for(const e of b.enemies){const p=path(e.p),key=e.seed;if(!d.hits.has(key)&&Math.hypot(p.x-head.x,p.y-head.y)<70){d.hits.add(key);e.hp-=damage(source,b)*10;e.hurt=.3;spark(d.bi,p.x,p.y,'#fff8cd',18);pop(d.bi,p.x,p.y-20,'×10','#ffe8a0')}}}}}
+ for(const d of [...whiteDragons]){const b=boards[d.bi],source=b?.units.find(u=>u.id===d.owner);if(!source){whiteDragons.splice(whiteDragons.indexOf(d),1);continue}d.p+=perimeter/6*dt;const lap=Math.floor(d.p/perimeter);if(lap!==d.lap){d.lap=lap;d.hits.clear()}if(d.p>=perimeter*2){whiteDragons.splice(whiteDragons.indexOf(d),1);continue}const head=path(d.p);for(const e of b.enemies){const ep=path(e.p),key=e.seed;if(!d.hits.has(key)&&Math.hypot(ep.x-head.x,ep.y-head.y)<70){d.hits.add(key);e.hp-=damage(source,b)*10;e.hurt=.3;spark(d.bi,ep.x,ep.y,'#fff8cd',18);pop(d.bi,ep.x,ep.y-20,'×10','#ffe8a0')}}}
 };
 const oldDragonBoard=drawBoard;
 drawBoard=function(b,bi,t){oldDragonBoard(b,bi,t);ctx.save();ctx.translate(0,bi*400);
@@ -471,7 +471,7 @@ if(drawerToggle)drawerToggle.remove();if(battleDrawer){while(battleDrawer.firstC
 const battleSummary=document.createElement('div');battleSummary.id='battleSkillInfo';document.querySelector('.arena-foot').after(battleSummary);
 const directUpdate=update;update=function(){directUpdate();const u=board()?.units.find(v=>v.id===selected),s=u&&skills[u.t];battleSummary.innerHTML=u?`<strong>${kinds[u.t].name}</strong><span>공격 ${Math.round(damage(u,board()))} · 사거리 ${kinds[u.t].range}</span><span>${s?`${s[0]} · ${s[2]} · <b>남은 쿨타임 ${Math.max(0,u.skillTimer??s[1]).toFixed(1)}초</b>`:'기본 공격 캐릭터'}</span>${whiteDragon?.owner===u.id?`<em>백룡 ${whiteDragon.lap+1}/2바퀴 순회 중</em>`:''}`:'<span>캐릭터를 누르면 평타·스킬·남은 쿨타임이 여기에 보여요.</span>'};
 const demo=document.createElement('button');demo.id='cheatSkillDemo';demo.textContent='선택 캐릭터 스킬 즉시 시연';$('cheatSpawn').after(demo);
-demo.onclick=()=>{const b=board(),u=b?.units.find(v=>v.id===selected);if(!running||!u)return toast('전투를 시작하고 캐릭터를 선택하세요');if(u.t===LUMI){whiteDragon={bi:active,p:0,lap:0,hits:new Set(),owner:u.id};u.skillTimer=23;toast('백룡이 몬스터 경로를 두 바퀴 돕니다')}else if(u.t===ARCHER){u.volley=3;u.volleyWait=0;u.skillTimer=16;toast('거대 화살 3발 시연')}else if(u.t===MAGE){u.lightningTime=2;u.lightningPulse=0;u.skillTimer=18;toast('기절 연쇄 번개 시연')}else if(u.t===22){u.sanctuaryTime=5;u.skillTimer=15;toast('원형 사기 마법진 시연')}else toast('시연은 루미·궁수·마법사·사제를 선택하세요');update()};
+demo.onclick=()=>{const b=board(),u=b?.units.find(v=>v.id===selected);if(!running||!u)return toast('전투를 시작하고 캐릭터를 선택하세요');if(u.t===LUMI){whiteDragons.push({bi:active,p:0,lap:0,hits:new Set(),dotQueue:[],owner:u.id});u.skillTimer=23;toast('백룡이 몬스터 경로를 두 바퀴 돕니다')}else if(u.t===ARCHER){u.volley=3;u.volleyWait=0;u.skillTimer=16;toast('거대 화살 3발 시연')}else if(u.t===MAGE){u.lightningTime=2;u.lightningPulse=0;u.skillTimer=18;toast('기절 연쇄 번개 시연')}else if(u.t===22){u.sanctuaryTime=5;u.skillTimer=15;toast('원형 사기 마법진 시연')}else toast('시연은 루미·궁수·마법사·사제를 선택하세요');update()};
 const directStyle=document.createElement('style');directStyle.textContent=`#battleSkillInfo{display:flex;flex-wrap:wrap;gap:7px 16px;align-items:center;padding:11px 14px;margin:7px 0;background:#1a3337;border:1px solid #8ab29a;border-radius:10px;color:#eef9df;font-size:12px;line-height:1.5}#battleSkillInfo strong{color:#ffe9a4}#battleSkillInfo b{color:#fff0a0}#battleSkillInfo em{color:#a8f5ed}.battle-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px;margin:8px 0}.battle-controls>div{min-height:76px;padding:6px!important}.battle-controls b,.battle-controls small{display:block;height:auto!important;font-size:11px}.battle-controls button{height:auto}.cheat-panel #cheatSkillDemo{padding:8px;border:1px solid #f1d487;border-radius:7px;color:#ffe5a1;background:#334345}aside>.unit-card,aside>.upgrade-card,aside>.mission-card{display:block!important}@media(min-width:850px){.battle-controls{grid-template-columns:repeat(4,minmax(0,1fr))!important}}`;document.head.append(directStyle);
 update();
 
@@ -604,7 +604,7 @@ function drawRiftDragonBody(d,t){
  const tail=pts[25],before=pts[24];ctx.save();ctx.translate(tail.x,tail.y);ctx.rotate(Math.atan2(before.y-tail.y,before.x-tail.x));ctx.fillStyle='#ead69a';ctx.beginPath();ctx.moveTo(5,0);ctx.lineTo(-23,-12);ctx.lineTo(-15,0);ctx.lineTo(-23,12);ctx.fill();ctx.restore();
  const h=pts[0],p=path(d.p-15),f=dragonFrames[2+Math.floor(t*9)%6];if(f){ctx.translate(h.x,h.y);ctx.rotate(Math.atan2(h.y-p.y,h.x-p.x));ctx.drawImage(f,-76,-62,152,124)}ctx.restore()
 }
-drawBoard=function(b,bi,t){riftDrawBoardPrevious(b,bi,t);if(whiteDragon&&whiteDragon.bi===bi){ctx.save();ctx.translate(0,bi*400);drawRiftDragonBody(whiteDragon,t);ctx.restore()}};
+drawBoard=function(b,bi,t){riftDrawBoardPrevious(b,bi,t);for(const dragon of whiteDragons){if(dragon.bi!==bi)continue;ctx.save();ctx.translate(0,bi*400);drawRiftDragonBody(dragon,t);ctx.restore()}};
 // Cap transient particle numbers to avoid piles of overlapping effect objects during rapid attacks.
 const riftOriginalSpark=spark;
 spark=function(owner,x,y,color,n=9){if(particles.length>180)return;riftOriginalSpark(owner,x,y,color,Math.min(n,8))};
@@ -2213,7 +2213,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       }
       if (data.rooms) {
         openRoomsMap.clear();
-        Object.values(data.rooms).forEach(rm => {
+        Object.values(data.rooms).forEach(raw => { const rm = raw?.meta || raw;
           if (rm && rm.roomId && rm.status === "waiting" && nowTs - (rm.updatedAt || nowTs) < 120000) {
             openRoomsMap.set(String(rm.roomId), rm);
           }
@@ -2232,7 +2232,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
         }
       }
       if (privateRoom && data.rooms && data.rooms[privateRoom.roomId]) {
-        const rm = data.rooms[privateRoom.roomId];
+        const rawRoom = data.rooms[privateRoom.roomId];
+        const rm = { ...(rawRoom.meta || rawRoom), p1Board: rawRoom.p1Board, p2Board: rawRoom.p2Board };
         if (rm.guest && (!privateRoom.guest || privateRoom.guest.uid !== rm.guest.uid)) {
           privateRoom.guest = rm.guest;
           duoPartnerInfo = rm.guest;
@@ -2273,7 +2274,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
         }
       }
       if (changed) refreshSocialDomOnly();
-    } catch (e) {}
+    } catch (e) { showFirebaseStatus('offline'); }
   }
 
   function broadcastEvent(type, payload) {
@@ -2283,7 +2284,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     if (type === "presence") firebasePush(`presence/${profile.uid}`, { ...payload, fromFb: true });
     if (type === "chat") firebasePush("lastChat", payload);
     if (type === "invite") firebasePush(`invites/${payload.toUid}`, { ...payload, sentAt: Date.now() });
-    if (type === "roomUpdate" && payload.roomId) firebasePush(`rooms/${payload.roomId}`, { ...payload, updatedAt: Date.now() });
+    if (type === "roomUpdate" && payload.roomId) firebasePush(`rooms/${payload.roomId}/meta`, { ...payload, updatedAt: Date.now() });
   }
 
   if (bcChannel) {
@@ -2341,7 +2342,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     };
   }
 
-  setInterval(() => {
+  function syncOnlineNow() {
     const nowTs = Date.now();
     for (const [k, u] of [...onlineUsersMap.entries()]) {
       if (nowTs - (u.lastSeen || 0) > 35000) {
@@ -2370,7 +2371,9 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       firebasePush(`rooms/${privateRoom.roomId}/${isHost ? "p1Board" : "p2Board"}`, bSnap);
     }
     firebasePoll();
-  }, 3500);
+  }
+  setInterval(syncOnlineNow, 2000);
+  setTimeout(syncOnlineNow, 150);
 
   function showInviteBanner(inv) {
     let banner = $("liveInvitePopup");
@@ -2413,7 +2416,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       };
       duoPartnerInfo = { uid: inv.fromUid, name: inv.fromName, lv: inv.fromLv || 1, favUnit: 25, subUnit: 23, color: "#80fff2", isReal: true };
       broadcastEvent("roomJoin", { roomId: inv.roomId, guest: myGuest });
-      broadcastEvent("roomUpdate", privateRoom);
+      firebasePush(`rooms/${inv.roomId}/meta/guest`, myGuest);
       lobbySubMode = "duo";
       showScreen(0);
       toast(`🤝 개인방 #${inv.roomId}에 입장했습니다!`);
@@ -2627,7 +2630,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
   };
 
   window.start = function() {
-    whiteDragon = null;
+    whiteDragon = null; whiteDragons = [];
     giantArrows = [];
     flyingSawblades.length = 0;
     activeSkillAnims.length = 0;
@@ -2688,7 +2691,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     playSkillSfx(ut);
 
     if (ut === 25) {
-      whiteDragon = { bi, p: 0, lap: 0, hits: new Set(), dotQueue: [], owner: u.id };
+      whiteDragons.push({ bi, p: 0, lap: 0, hits: new Set(), dotQueue: [], owner: u.id });
       pop(bi, c.x, c.y - 45, '🐉 백룡 선회 · 2배속 질주!', '#fff5c7', true);
       activeSkillAnims.push({ bi, type: 'dragonSummon', x: c.x, y: c.y, life: 1.0, max: 1.0 });
       return;
@@ -3069,8 +3072,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       // Partner board updates exclusively via real Firebase / BroadcastChannel sync
     }
 
-    if (whiteDragon) {
-      const d = whiteDragon;
+    for (const d of [...whiteDragons]) {
       const b = boards[d.bi];
       const source = b?.units.find(u => u.id === d.owner);
       if (source) {
@@ -3081,7 +3083,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
           d.hits.clear();
         }
         if (d.p >= perimeter * 2) {
-          whiteDragon = null;
+          whiteDragons.splice(whiteDragons.indexOf(d), 1);
         } else {
           const head = path(d.p);
           d.dotQueue ??= [];
@@ -4596,6 +4598,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       const code = String(rawCode || "").replace(/[^0-9]/g, "");
       if (!code) return toast("입장할 4자리 방 코드를 입력해 주세요.");
       const existing = openRoomsMap.get(code);
+      if (!existing) return toast("방을 찾을 수 없습니다. 두 기기 모두 서버 온라인인지 확인하세요.");
+      if (existing.hostUid === profile.uid) return toast("자신이 만든 방입니다.");
       const myGuest = {
         uid: profile.uid,
         name: profile.nickname,
@@ -4624,7 +4628,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
         isReal: true
       };
       broadcastEvent("roomJoin", { roomId: code, guest: myGuest });
-      broadcastEvent("roomUpdate", privateRoom);
+      firebasePush(`rooms/${code}/meta/guest`, myGuest);
       upgradeBurst();
       toast(`🎉 개인방 [#${code}]에 입장했습니다!`);
       riftLobby();
@@ -4675,6 +4679,9 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       $('riftEnterBattle').onclick = () => {
         if (profile.bannedUsers?.[profile.uid]) return toast('⛔ 관리자에 의해 정지된 계정입니다 (UID: ' + profile.uid + ')');
         if (lobbySubMode === 'duo') {
+          if (!privateRoom) return toast('온라인 협동은 방을 만들거나 방 코드로 입장해야 합니다.');
+          if (privateRoom.hostUid !== profile.uid) return toast('방장이 전투를 시작할 때 자동으로 입장합니다.');
+          if (!privateRoom.guest) return toast('다른 플레이어가 입장할 때까지 기다려 주세요.');
           if (privateRoom) {
             privateRoom.status = 'playing';
             broadcastEvent('roomStart', { roomId: privateRoom.roomId });
