@@ -53,9 +53,9 @@ body{background:#101b23}header{height:52px}main{max-width:1050px;padding:12px 16
 .rift-gacha-feature.normal{background:radial-gradient(ellipse at 50% 65%,#4f825a 0,#285447 38%,#172c37 85%)}
 .rift-gacha-feature-hd{position:relative;z-index:2;display:flex;justify-content:space-between;gap:8px;align-items:center;color:#eedca8;font-weight:900;font-size:10px;letter-spacing:1px}
 .rift-gacha-feature-hd b{color:#392923;background:#f1d48d;border-radius:20px;padding:4px 9px;letter-spacing:0}
-.rift-pickup-stage{height:190px;display:grid;place-items:center;position:relative}
+.rift-pickup-stage{height:250px;display:grid;place-items:center;position:relative}
 .rift-dragon-sigil{position:absolute;font-size:200px;top:-55px;left:calc(50% - 100px);color:#ffdfa112;pointer-events:none}
-#riftLumiPreview{position:relative;display:block;width:100%;max-width:290px;height:190px;object-fit:contain}
+#riftLumiPreview{position:relative;display:block;width:100%;max-width:360px;height:250px;object-fit:contain}
 .rift-feature-caption{text-align:center;position:relative;z-index:2}
 .rift-feature-caption .rift-rank{display:block;font-size:11px;font-weight:900;color:#ffe49f;letter-spacing:1px}
 #meta-screen .rift-feature-caption h2{margin:4px 0;font-size:25px;color:#fff7de}
@@ -82,7 +82,7 @@ body{background:#101b23}header{height:52px}main{max-width:1050px;padding:12px 16
 .deal-icon img{display:block;object-fit:contain}
 .deal-icon svg.rift-shop-illustration{display:block;width:94px;height:94px;max-width:100%;max-height:100%;filter:drop-shadow(0 4px 3px #29354544)}
 @keyframes riftSpin{to{transform:rotate(360deg)}}@keyframes riftPulse{50%{opacity:.56;filter:brightness(1.28)}}@keyframes riftBob{to{transform:translateY(-7px)}}
-@media(max-width:640px){#meta-screen{padding:2px 4px 98px!important}.rift-lobby-head,.rift-gacha-head{align-items:flex-start}.rift-lobby-head{flex-direction:column;gap:10px}.rift-wallet>span{padding:6px 8px;font-size:12px}.rift-main-hero{min-height:338px}.rift-main-copy{width:67%;padding:32px 0 21px 18px}.rift-gate{right:-10%;top:12%}.rift-halo{right:-17%}.rift-main-copy p{font-size:11px}.rift-shortcuts{gap:7px}#meta-screen .rift-shortcuts button{padding:12px 9px}.rift-shortcuts strong{font-size:11px}.rift-shortcut-glyph{width:34px;height:34px;font-size:21px}.rift-bottom-info{padding:12px}.rift-gacha-head{flex-direction:column;gap:7px}.rift-gacha-feature{min-height:292px;padding:11px}.rift-pickup-stage{height:174px}#riftLumiPreview{height:174px}.rift-gacha-actions{gap:6px}.rift-pull-results{grid-template-columns:repeat(3,minmax(0,1fr))}.deal-icon svg.rift-shop-illustration{width:65px;height:65px}.rift-pull-card canvas{max-width:72px}}
+@media(max-width:640px){#meta-screen{padding:2px 4px 98px!important}.rift-lobby-head,.rift-gacha-head{align-items:flex-start}.rift-lobby-head{flex-direction:column;gap:10px}.rift-wallet>span{padding:6px 8px;font-size:12px}.rift-main-hero{min-height:338px}.rift-main-copy{width:67%;padding:32px 0 21px 18px}.rift-gate{right:-10%;top:12%}.rift-halo{right:-17%}.rift-main-copy p{font-size:11px}.rift-shortcuts{gap:7px}#meta-screen .rift-shortcuts button{padding:12px 9px}.rift-shortcuts strong{font-size:11px}.rift-shortcut-glyph{width:34px;height:34px;font-size:21px}.rift-bottom-info{padding:12px}.rift-gacha-head{flex-direction:column;gap:7px}.rift-gacha-feature{min-height:292px;padding:11px}.rift-pickup-stage{height:220px}#riftLumiPreview{height:220px}.rift-gacha-actions{gap:6px}.rift-pull-results{grid-template-columns:repeat(3,minmax(0,1fr))}.deal-icon svg.rift-shop-illustration{width:65px;height:65px}.rift-pull-card canvas{max-width:72px}}
 @media(prefers-reduced-motion:reduce){.rift-inner span,.rift-gate:before,.rift-spark,.rift-roster-member{animation:none!important}}
 
 </style></head>
@@ -526,7 +526,7 @@ function riftGacha(){
   const pickup=riftGachaMode==='pickup';
   screen.innerHTML=`<section class="rift-gacha-screen"><div class="rift-gacha-head"><div><small>GUARDIAN SUMMON</small><h1>수호자 소환</h1></div><div class="rift-wallet" id="riftGachaWallet">${walletRift()}</div></div>
   <div class="rift-banner-tabs" role="tablist" aria-label="뽑기 종류"><button role="tab" aria-selected="${!pickup}" class="${!pickup?'active':''}" data-rift-mode="normal">일반 뽑기</button><button role="tab" aria-selected="${pickup}" class="${pickup?'active':''}" data-rift-mode="pickup">초월 픽업</button></div>
-  ${pickup?`<div class="rift-gacha-feature pickup"><div class="rift-gacha-feature-hd"><span>TRANSCENDENT PICK UP</span><b>기간 한정 확률 UP</b></div><div class="rift-pickup-stage"><span class="rift-dragon-sigil">✦</span><canvas id="riftLumiPreview" width="320" height="270" aria-label="백룡의 루미 움직이는 캐릭터 일러스트"></canvas></div><div class="rift-feature-caption"><span class="rift-rank">초월 · ★★★★★★</span><h2>백룡의 루미</h2><p>백룡 선회 · 23초마다 몬스터 경로를 2바퀴 순회</p></div></div>`:
+  ${pickup?`<div class="rift-gacha-feature pickup"><div class="rift-gacha-feature-hd"><span>TRANSCENDENT PICK UP</span><b>기간 한정 확률 UP</b></div><div class="rift-pickup-stage"><span class="rift-dragon-sigil">✦</span><canvas id="riftLumiPreview" width="400" height="330" aria-label="백룡의 루미 움직이는 캐릭터 일러스트"></canvas></div><div class="rift-feature-caption"><span class="rift-rank">초월 · ★★★★★★</span><h2>백룡의 루미</h2><p>백룡 선회 · 23초마다 몬스터 경로를 2바퀴 순회</p></div></div>`:
   `<div class="rift-gacha-feature normal"><div class="rift-gacha-feature-hd"><span>STANDARD SUMMON</span><b>상시 모집</b></div><h2>새로운 수호자와 함께!</h2><div class="rift-common-roster">${[8,9,10,11].map((i,n)=>`<div class="rift-roster-member" style="--delay:${n}"><canvas class="rift-roster-canvas" width="110" height="110"></canvas></div>`).join('')}</div><p>다양한 속성의 수호자 조각을 획득하세요.</p></div>`}
   <div class="rift-pull-meta"><span>${pickup?'백룡의 루미 1.8%':'백룡의 루미 0.2%'}</span><span>픽업은 초월 루미 등장 확률만 증가</span></div>
   <div class="rift-gacha-actions" aria-label="소환 횟수"><button data-rift-pull="1"><small>1회</small><strong>◆ 100</strong></button><button data-rift-pull="10"><small>10회</small><strong>◆ 900</strong></button><button data-rift-pull="100"><small>100회</small><strong>◆ 8,500</strong></button></div>
@@ -547,11 +547,11 @@ function riftStartLumiPreview(){
     // Keep the animated art lightweight; all animation stops when leaving this screen.
     const gr=g.createRadialGradient(w*.5,h*.48,4,w*.5,h*.5,130);gr.addColorStop(0,'#fff1b64d');gr.addColorStop(.5,'#99dbff25');gr.addColorStop(1,'#fff0');g.fillStyle=gr;g.fillRect(0,0,w,h);
     g.strokeStyle='#f5d888';g.lineWidth=2;g.globalAlpha=.6;
-    g.beginPath();g.ellipse(w/2,224,108+Math.sin(t)*4,21,0,0,Math.PI*2);g.stroke();
-    for(let n=0;n<8;n++){const a=n*Math.PI/4+t*.25;g.fillStyle=n%2?'#ffffff':'#ffe8a2';g.globalAlpha=.36+.24*Math.sin(t*2+n);g.beginPath();g.arc(w/2+Math.cos(a)*116,126+Math.sin(a)*78,2.5+(n%3),0,Math.PI*2);g.fill()}
+    g.beginPath();g.ellipse(w/2,h*.85,108+Math.sin(t)*4,21,0,0,Math.PI*2);g.stroke();
+    for(let n=0;n<8;n++){const a=n*Math.PI/4+t*.25;g.fillStyle=n%2?'#ffffff':'#ffe8a2';g.globalAlpha=.36+.24*Math.sin(t*2+n);g.beginPath();g.arc(w/2+Math.cos(a)*116,h*.48+Math.sin(a)*78,2.5+(n%3),0,Math.PI*2);g.fill()}
     g.globalAlpha=1;
-    lumiArt(g,w/2,137+bob,182,(Math.sin(t*2.4)+1)/5,t,(Math.sin(t*1.1)+1)/5);
-    if(dragonSheet.complete&&dragonSheet.naturalWidth){const fw=dragonSheet.naturalWidth/8,fh=Math.min(445,dragonSheet.naturalHeight),fi=Math.floor(t*6)%8;g.globalAlpha=.78;g.drawImage(dragonSheet,fi*fw,0,fw,fh,211,17,103,96)}
+    lumiArt(g,w/2,h*.52+bob,155,(Math.sin(t*2.4)+1)/5,t,(Math.sin(t*1.1)+1)/5);
+    if(dragonSheet.complete&&dragonSheet.naturalWidth){const fw=dragonSheet.naturalWidth/8,fh=Math.min(445,dragonSheet.naturalHeight),fi=Math.floor(t*6)%8;g.globalAlpha=.78;g.drawImage(dragonSheet,fi*fw,0,fw,fh,w*.72,h*.09,90,85)}
     g.restore();
   }
   riftPreviewHandle=requestAnimationFrame(paint);
@@ -2153,6 +2153,18 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     bcChannel = new BroadcastChannel("lucky_rift_multi_v6");
   } catch (e) {}
 
+  // Shared game endpoint: no URL entry required on each device.
+  const DEFAULT_RIFT_DB = "https://global-b299e-default-rtdb.asia-southeast1.firebasedatabase.app";
+  if (profile.firebaseDbUrl !== DEFAULT_RIFT_DB) {
+    profile.firebaseDbUrl = DEFAULT_RIFT_DB;
+    saveProfile();
+  }
+  let firebaseConnectionState = 'connecting';
+  function showFirebaseStatus(state) {
+    firebaseConnectionState = state;
+    const el = document.getElementById('fbConfigBtn');
+    if (el) el.textContent = state === 'online' ? '🟢 서버 온라인' : state === 'denied' ? '🔒 서버 권한 오류' : state === 'offline' ? '🔴 서버 연결 실패' : '🟡 연결 확인 중';
+  }
   function getCleanFbHost() {
     return (profile.firebaseDbUrl || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
   }
@@ -2161,12 +2173,14 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     const dbUrl = getCleanFbHost();
     if (!dbUrl) return;
     try {
-      await fetch(`https://${dbUrl}/luckyRift/${pathStr}.json`, {
+      const response = await fetch(`https://${dbUrl}/luckyRift/${pathStr}.json`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataObj)
       });
-    } catch (e) {}
+      if (!response.ok) { showFirebaseStatus(response.status === 401 || response.status === 403 ? 'denied' : 'offline'); return; }
+      showFirebaseStatus('online');
+    } catch (e) { showFirebaseStatus('offline'); }
   }
 
   async function firebasePoll() {
@@ -2174,7 +2188,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     if (!dbUrl) return;
     try {
       const res = await fetch(`https://${dbUrl}/luckyRift.json`);
-      if (!res.ok) return;
+      if (!res.ok) { showFirebaseStatus(res.status === 401 || res.status === 403 ? 'denied' : 'offline'); return; }
+      showFirebaseStatus('online');
       const data = await res.json();
       if (!data) return;
       const nowTs = Date.now();
@@ -4064,8 +4079,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
             <strong>🔥 실시간 전체 채팅 & 실제 온라인 유저 (${onlineList.length + 1}명 접속 중)</strong>
           </div>
           <div class="sh-top-actions">
-            <button id="editNickBtn" class="sh-sm-btn">✏ 닉네임(${profile.nickname})</button>
-            <button id="fbConfigBtn" class="sh-sm-btn ${profile.firebaseDbUrl ? "fb-connected" : ""}">🔥 ${profile.firebaseDbUrl ? "Firebase 연결됨" : "Firebase 서버 연결"}</button>
+            <button id="editNickBtn" class="sh-sm-btn">${profile.avatar || "🛡️"} 프로필(${profile.nickname})</button>
+            <button id="fbConfigBtn" class="sh-sm-btn">🟡 연결 확인 중</button>
           </div>
         </div>
 
@@ -4207,16 +4222,22 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
           <div class="admin-mail-wrap gothic-ui">
             <div class="am-head"><h2>✏ 멀티 닉네임 변경</h2></div>
             <label class="adm-field">
-              <span>새 닉네임 입력 (전체 채팅 및 멀티 방에 표시됩니다)</span>
+              <span>프로필 설정 · 닉네임 (전체 채팅 및 멀티 방에 표시됩니다)</span>
               <input id="newNickInput" type="text" maxlength="14" value="${profile.nickname}">
             </label>
+            <label class="adm-field"><span>프로필 아이콘</span><select id="profileAvatarSelect"><option value="🛡️">🛡️ 수호자</option><option value="🐉">🐉 용</option><option value="⚔️">⚔️ 검사</option><option value="🔮">🔮 마법사</option><option value="🌟">🌟 별</option></select></label>
+            <label class="adm-field"><span>프로필 소개</span><input id="profileBioInput" type="text" maxlength="50" placeholder="한 줄 소개"></label>
             <button id="saveNickBtn" class="am-primary-btn full-w" style="margin-top:10px">닉네임 저장하기</button>
           </div>
         `);
+        $("profileAvatarSelect").value = profile.avatar || '🛡️';
+        $("profileBioInput").value = profile.bio || '';
         $("saveNickBtn").onclick = () => {
           const v = ($("newNickInput").value || "").trim();
           if (v) {
             profile.nickname = v;
+            profile.avatar = $("profileAvatarSelect").value;
+            profile.bio = $("profileBioInput").value.trim();
             saveProfile();
             $("modal").close();
             toast(`닉네임이 [${v}](으)로 변경되었습니다!`);
@@ -4226,28 +4247,14 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       };
     }
     if ($("fbConfigBtn")) {
-      $("fbConfigBtn").onclick = () => {
-        modal(`
-          <div class="admin-mail-wrap gothic-ui">
-            <div class="am-head"><h2>🔥 Firebase 실시간 멀티 서버 설정</h2></div>
-            <p style="font-size:12px;color:#b5d2dc;line-height:1.5">
-              파이어베이스 Realtime Database URL(예: <code>https://프로젝트명-default-rtdb.firebaseio.com</code>)을 입력하면 실제 접속 중인 온라인 유저 목록·전체 채팅·개인방 초대가 실시간 동기화됩니다.
-            </p>
-            <label class="adm-field">
-              <span>Firebase Realtime Database URL</span>
-              <input id="fbUrlInput" type="text" placeholder="https://your-project-default-rtdb.firebaseio.com" value="${profile.firebaseDbUrl || ""}">
-            </label>
-            <button id="saveFbUrlBtn" class="am-primary-btn full-w" style="margin-top:10px">🔥 서버 주소 저장 및 즉시 연결</button>
-          </div>
-        `);
-        $("saveFbUrlBtn").onclick = () => {
-          profile.firebaseDbUrl = ($("fbUrlInput").value || "").trim();
-          saveProfile();
-          $("modal").close();
-          firebasePoll();
-          toast(profile.firebaseDbUrl ? "🔥 Firebase 실시간 멀티 서버에 연결되었습니다!" : "로컬/멀티탭 실시간 모드로 설정되었습니다.");
-          if (currentScreenIdx === 0) riftLobby();
-        };
+      showFirebaseStatus(firebaseConnectionState);
+      $("fbConfigBtn").onclick = async () => {
+        showFirebaseStatus('connecting');
+        await firebasePoll();
+        const message = firebaseConnectionState === 'online' ? 'Firebase 서버 응답 정상' :
+          firebaseConnectionState === 'denied' ? 'Firebase 접근 거부: 보안 규칙의 기한 또는 인증 설정을 확인하세요.' :
+          'Firebase 연결 실패: 네트워크와 데이터베이스 설정을 확인하세요.';
+        toast(message);
       };
     }
 
