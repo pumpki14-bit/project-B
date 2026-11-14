@@ -2341,6 +2341,7 @@ const nowTs = Date.now();
           if (currentScreenIdx === 0) riftLobby();
         }
         if (rm.status === "playing" && !running) {
+          privateRoom.status = "playing";
           lobbySubMode = "duo";
           isInfiniteMode = true;
           setMode("duo");
@@ -2465,6 +2466,7 @@ const nowTs = Date.now();
         toast(`🎉 [${payload.guest.name}]님이 개인방(#${privateRoom.roomId})에 입장했습니다!`);
         if (currentScreenIdx === 0) riftLobby();
       } else if (type === "roomStart" && privateRoom && String(payload?.roomId) === String(privateRoom.roomId)) {
+        privateRoom.status = "playing";
         lobbySubMode = "duo";
         isInfiniteMode = true;
         setMode("duo");
@@ -11205,6 +11207,27 @@ console.info('[Lucky Rift] UX patch and added characters',kinds.length,window.ri
     body.battle-view .arena-top #riftSynergyToggle{display:none!important}
     body.battle-view .wavebar{min-height:0!important}
   </style>`);
+})();
+
+</script>
+<script id="rift-duo-autostart">
+/* Entering a ready cooperative battle starts the engine without a second prompt. */
+(()=>{
+  function ready(){return !privateRoom||privateRoom.status==='playing'||window.riftAiPartnerMode}
+  function enter(){
+    if(mode!=='duo'||screen.style.display!=='none')return;
+    const overlay=document.getElementById('start-overlay');
+    if(!ready()){
+      if(overlay){overlay.hidden=false;overlay.style.display='flex';const button=overlay.querySelector('button');if(button)button.hidden=true;}
+      return;
+    }
+    if(!running)window.start();
+    if(running&&overlay){overlay.hidden=true;overlay.style.display='none';}
+  }
+  const oldShow=window.showScreen;
+  window.showScreen=function(i){const result=oldShow(i);if(i===2)queueMicrotask(enter);return result};
+  document.getElementById('mode-duo')?.addEventListener('click',()=>queueMicrotask(enter));
+  document.head.insertAdjacentHTML('beforeend','<style>body.battle-view #start-overlay button[hidden]{display:none!important}</style>');
 })();
 
 </script>
