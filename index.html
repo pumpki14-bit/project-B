@@ -161,7 +161,7 @@ const kinds=[
  {name:'천공 수호자',sheet:'evolved',sprite:7,tier:5,color:'#80fff2',damage:520,rate:.55,range:360,style:'chain',desc:'전장을 관통하는 천공의 힘'}
 ];
 const atlasCrops={creatures:[[75,180,310,225],[465,110,320,300],[830,165,330,250],[1185,180,420,220],[65,560,340,290],[480,520,260,330],[810,560,335,280],[1180,510,420,340]],guardians:[[85,145,300,260],[450,140,335,260],[895,150,310,265],[1280,100,300,315],[55,515,340,330],[410,515,400,335],[845,500,380,350],[1250,480,370,370]],evolved:Array.from({length:8},(_,i)=>[(i%4)*443,Math.floor(i/4)*443,443,443]),scholars:[[0,0,887,887],[887,0,887,887]]};const atlases={};for(const [key,file] of Object.entries({creatures:'assets/creatures.png',guardians:'assets/guardians.png',slime:'assets/slime-motion.png',evolved:'assets/evolved.png',scholars:'assets/scholars.png'})){const img=new Image();img.src=ASSETS[file]||file;atlases[key]=img}
-const rankPool=r=>kinds.map((k,i)=>({k,i})).filter(({k})=>(k.tier||0)===(r===3?2:r));const randomKind=r=>{const pool=rankPool(r);return pool[Math.floor(Math.random()*pool.length)].i};
+const rankPool=r=>kinds.map((k,i)=>({k,i})).filter(({k})=>(k.tier||0)===(r===3?2:r));const randomKind=r=>{const pool=rankPool(r);return pool[Math.floor(Math.random()*pool.length)].i};const randomOwnedKind=r=>{const owned=kinds.map((k,i)=>({k,i})).filter(({i})=>profile.unlocked?.[i]);const pool=owned.filter(({k})=>(k.tier||0)===(r===3?2:r));const options=pool.length?pool:owned;return options.length?options[Math.floor(Math.random()*options.length)].i:randomKind(r)};
 const cells=Array.from({length:20},(_,i)=>({x:231+i%5*84,y:100+Math.floor(i/5)*62}));
 const missions=[{kills:15,gems:2,gold:60},{kills:40,gems:3,gold:100},{kills:80,gems:5,gold:150}];
 let mode='solo',boards=[],active=0,selected=null,wave=1,timer=30,spawnTimer=0,bossSpawned=false,running=false,paused=false,speed=1,last=0,clock=0,sound=true,audioCtx,toastTimer,uid=0,projectiles=[],particles=[];
@@ -178,8 +178,8 @@ function probabilities(b){let lv=b.summonLevel;return[.65-lv*.065,.25+lv*.026,.0
 function randomRank(b){let v=Math.random(),odds=probabilities(b);for(let i=0;i<odds.length;i++){v-=odds[i];if(v<0)return i}return 3}
 function freeCell(b){return cells.findIndex((_,i)=>!b.units.some(u=>u.cell===i))}
 function addUnit(b,t,r,cell,merge=true){const u={id:++uid,t,r,cell,drawX:cells[cell].x,drawY:cells[cell].y,cd:Math.random()*.3,attack:0,age:Math.random()*9};b.units.push(u);spark(boards.indexOf(b),cells[cell].x,cells[cell].y,kinds[t].color,8);if(merge&&window.autoMergeEnabled!==false)autoMerge(b);return u}
-function autoMerge(b){let again=true;while(again){again=false;for(let r=0;r<4;r++){const group=b.units.filter(u=>u.r===r).sort((a,c)=>a.id-c.id);if(group.length<3)continue;const three=group.slice(0,3),cell=three[0].cell;b.units=b.units.filter(u=>!three.includes(u));const next=addUnit(b,randomKind(r+1),r+1,cell,false);if(r+1>=4)announceRare(next);if(b===board())selected=next.id;const owner=boards.indexOf(b),pos=cells[cell];spark(owner,pos.x,pos.y,rankColors[r+1],22);pop(owner,pos.x,pos.y-35,`${rankNames[r+1]} 합성!`,rankColors[r+1]);toast(`${rankNames[r]} 3개 → ${rankNames[r+1]} 자동 합성!`);beep(740+r*85);again=true;break}}}
-function summon(lucky=false){if(!running)return toast('전투를 먼저 시작하세요');if(paused)return toast('일시정지를 풀어 주세요');const b=board(),cell=freeCell(b);if(cell<0)return toast('전장이 가득 찼어요. 아군을 판매하세요.');if(lucky){if(b.gems<2)return toast('행운석이 부족해요');b.gems-=2;if(Math.random()>.35){toast('행운 소환 실패!');beep(170);update();return}addUnit(b,randomKind(2),Math.random()<.16?3:2,cell);toast('행운 소환 성공!')}else{if(b.gold<cost(b))return toast('골드가 부족해요');b.gold-=cost(b);b.summons++;(()=>{const r=randomRank(b);addUnit(b,randomKind(r),r,cell)})();beep(420)}update()}
+function autoMerge(b){let again=true;while(again){again=false;for(let r=0;r<4;r++){const group=b.units.filter(u=>u.r===r).sort((a,c)=>a.id-c.id);if(group.length<3)continue;const three=group.slice(0,3),cell=three[0].cell;b.units=b.units.filter(u=>!three.includes(u));const next=addUnit(b,randomOwnedKind(r+1),r+1,cell,false);if(r+1>=4)announceRare(next);if(b===board())selected=next.id;const owner=boards.indexOf(b),pos=cells[cell];spark(owner,pos.x,pos.y,rankColors[r+1],22);pop(owner,pos.x,pos.y-35,`${rankNames[r+1]} 합성!`,rankColors[r+1]);toast(`${rankNames[r]} 3개 → ${rankNames[r+1]} 자동 합성!`);beep(740+r*85);again=true;break}}}
+function summon(lucky=false){if(!running)return toast('전투를 먼저 시작하세요');if(paused)return toast('일시정지를 풀어 주세요');if(!profile.unlocked?.some(Boolean))return toast('보유한 수호자가 없어요. 뽑기에서 캐릭터를 먼저 획득하세요.');const b=board(),cell=freeCell(b);if(cell<0)return toast('전장이 가득 찼어요. 아군을 판매하세요.');if(lucky){if(b.gems<2)return toast('행운석이 부족해요');b.gems-=2;if(Math.random()>.35){toast('행운 소환 실패!');beep(170);update();return}addUnit(b,randomOwnedKind(2),Math.random()<.16?3:2,cell);toast('행운 소환 성공!')}else{if(b.gold<cost(b))return toast('골드가 부족해요');b.gold-=cost(b);b.summons++;(()=>{const r=randomRank(b);addUnit(b,randomOwnedKind(r),r,cell)})();beep(420)}update()}
 function damage(u,b){return kinds[u.t].damage*Math.pow(2.5,u.r)*(1+.2*b.level)*(u.moraleTime>0?2:1)}
 const perimeter=2010;
 function path(p){p=((p%perimeter)+perimeter)%perimeter;if(p<690)return{x:55+p,y:42};if(p<1005)return{x:745,y:42+p-690};if(p<1695)return{x:745-(p-1005),y:357};return{x:55,y:357-(p-1695)}}
@@ -2245,7 +2245,29 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     } catch (e) { showFirebaseStatus('offline'); }
   }
 
-  async function firebasePoll() {
+     async function writeRemoteMail(targetUid, mail) {
+     const token = await ensureRiftAuth();
+     const response = await fetch(riftDbEndpoint(`mailboxes/${targetUid}/${mail.id}`, token), {
+       method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(mail)
+     });
+     if (!response.ok) throw new Error('우편 서버 저장 실패 (HTTP ' + response.status + ')');
+     return true;
+   }
+   async function readRoomMeta(roomId) {
+     const token = await ensureRiftAuth();
+     const response = await fetch(riftDbEndpoint(`rooms/${roomId}/meta`, token), {cache:'no-store'});
+     if (!response.ok) throw new Error('방 정보를 읽지 못했습니다 (HTTP ' + response.status + ')');
+     return await response.json();
+   }
+   async function writeRoomMeta(roomId, meta) {
+     const token = await ensureRiftAuth();
+     const response = await fetch(riftDbEndpoint(`rooms/${roomId}/meta`, token), {
+       method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...meta,updatedAt:Date.now()})
+     });
+     if (!response.ok) throw new Error('방 시작을 서버에 기록하지 못했습니다 (HTTP ' + response.status + ')');
+   }
+   function cleanMailText(value) { return String(value||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function firebasePoll() {
     const dbUrl = getCleanFbHost();
     if (!dbUrl) return;
     try {
@@ -2255,7 +2277,22 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       showFirebaseStatus('online');
       const data = await res.json();
       if (!data) return;
-      const nowTs = Date.now();
+             const incoming = data.mailboxes?.[profile.uid] || {};
+       let mailAdded = false;
+       for (const raw of Object.values(incoming)) {
+         if (!raw || typeof raw !== 'object' || !/^mail-[A-Za-z0-9_-]{1,60}$/.test(String(raw.id||''))) continue;
+         if (profile.mailbox.some(m => m.id === raw.id)) continue;
+         const attachments = Array.isArray(raw.attachments) ? raw.attachments.slice(0,20).filter(a =>
+           (a.type === 'char' && kinds[a.id] || a.type === 'relic' && profile.relics[a.id]) &&
+           Number.isSafeInteger(a.count) && a.count > 0 && a.count <= 99999999
+         ).map(a=>({type:a.type,id:Number(a.id),count:a.count})) : [];
+         profile.mailbox.unshift({id:raw.id,type:raw.type==='notice'?'notice':'personal',sender:cleanMailText(raw.sender),
+           title:cleanMailText(raw.title),body:cleanMailText(raw.body),gems:Math.max(0,Math.min(99999999,Number(raw.gems)||0)),
+           gold:Math.max(0,Math.min(99999999,Number(raw.gold)||0)),attachments,claimed:false});
+         mailAdded = true;
+       }
+       if (mailAdded) { saveProfile(); toast('📨 새 우편이 도착했습니다'); }
+const nowTs = Date.now();
       let changed = false;
       if (data.presence) {
         const seenUids = new Set();
@@ -4635,20 +4672,23 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
 
     screen.querySelectorAll("[data-slot-canvas]").forEach(cv => drawPortrait(cv, +cv.dataset.slotCanvas));
 
-    const createRoomFn = () => {
-      privateRoom = {
-        roomId: String(1000 + Math.floor(Math.random() * 9000)),
-        hostUid: profile.uid,
-        hostName: profile.nickname,
-        hostLv: profile.accLv || 1,
-        guest: null,
-        status: "waiting"
-      };
-      openRoomsMap.set(String(privateRoom.roomId), privateRoom);
-      broadcastEvent("roomUpdate", privateRoom);
-      beep(740);
-      toast(`🏠 개인방(#${privateRoom.roomId})이 생성되었습니다! 방 코드를 공유하거나 실제 접속 유저를 초대하세요.`);
-      riftLobby();
+    const createRoomFn = async () => {
+      const btn=$("createPrivateRoomBtn")||$("createRoomQuickBtn");if(btn)btn.disabled=true;
+      try {
+        let code,existing;
+        for(let attempt=0;attempt<8;attempt++){
+          code=String(1000+Math.floor(Math.random()*9000));existing=await readRoomMeta(code);
+          if(!existing || existing.status!=="waiting")break;
+        }
+        if(existing?.status==="waiting")throw new Error("빈 방 코드를 찾지 못했어요. 다시 시도하세요.");
+        const room={roomId:code,hostUid:profile.uid,hostName:profile.nickname,
+          hostLv:profile.accLv||1,guest:null,status:"waiting"};
+        await writeRoomMeta(code,room);
+        privateRoom=room;openRoomsMap.set(code,room);
+        broadcastEvent("roomUpdate",room);beep(740);
+        toast(`🏠 개인방(#${code})이 생성되었습니다! 방 코드를 공유하거나 실제 접속 유저를 초대하세요.`);
+        riftLobby();
+      }catch(e){toast(e.message||"방 생성 실패");if(btn?.isConnected)btn.disabled=false}
     };
     if ($("createPrivateRoomBtn")) $("createPrivateRoomBtn").onclick = createRoomFn;
     if ($("createRoomQuickBtn")) $("createRoomQuickBtn").onclick = createRoomFn;
@@ -4707,44 +4747,29 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       };
     });
 
-    const joinByCodeFn = (rawCode) => {
+    const joinByCodeFn = async (rawCode) => {
       const code = String(rawCode || "").replace(/[^0-9]/g, "");
-      if (!code) return toast("입장할 4자리 방 코드를 입력해 주세요.");
-      const existing = openRoomsMap.get(code);
-      if (!existing) return toast("방을 찾을 수 없습니다. 두 기기 모두 서버 온라인인지 확인하세요.");
-      if (existing.hostUid === profile.uid) return toast("자신이 만든 방입니다.");
-      const myGuest = {
-        uid: profile.uid,
-        name: profile.nickname,
-        lv: profile.accLv || 1,
-        favUnit: 30,
-        subUnit: 25,
-        color: "#c5f86a",
-        ready: true,
-        isReal: true
-      };
-      privateRoom = {
-        roomId: code,
-        hostUid: existing?.hostUid || ("HOST-" + code),
-        hostName: existing?.hostName || ("방장 #" + code),
-        hostLv: existing?.hostLv || 1,
-        guest: myGuest,
-        status: "waiting"
-      };
-      duoPartnerInfo = {
-        uid: privateRoom.hostUid,
-        name: privateRoom.hostName,
-        lv: privateRoom.hostLv,
-        favUnit: 25,
-        subUnit: 23,
-        color: "#80fff2",
-        isReal: true
-      };
-      broadcastEvent("roomJoin", { roomId: code, guest: myGuest });
-      firebasePush(`rooms/${code}/meta/guest`, myGuest);
-      upgradeBurst();
-      toast(`🎉 개인방 [#${code}]에 입장했습니다!`);
-      riftLobby();
+      if (!/^\d{4}$/.test(code)) return toast("입장할 4자리 방 코드를 입력해 주세요.");
+      try {
+        const existing = await readRoomMeta(code);
+        if (!existing || existing.status !== "waiting") throw new Error("대기 중인 방을 찾을 수 없습니다.");
+        if (existing.hostUid === profile.uid) throw new Error("자신이 만든 방입니다.");
+        if (existing.guest?.uid && existing.guest.uid !== profile.uid) throw new Error("이미 다른 상대가 입장한 방입니다.");
+        const myGuest = {
+          uid: profile.uid, name: profile.nickname, lv: profile.accLv || 1,
+          favUnit: 30, subUnit: 25, color: "#c5f86a", ready: true, isReal: true
+        };
+        await writeRoomMeta(code, {...existing,guest:myGuest,status:"waiting"});
+        privateRoom = {...existing,guest:myGuest,status:"waiting"};
+        duoPartnerInfo = {
+          uid: existing.hostUid, name: existing.hostName, lv: existing.hostLv || 1,
+          favUnit: 25, subUnit: 23, color: "#80fff2", isReal: true
+        };
+        broadcastEvent("roomJoin", { roomId: code, guest: myGuest });
+        upgradeBurst();
+        toast(`🎉 개인방 [#${code}]에 입장했습니다!`);
+        riftLobby();
+      } catch(e) { toast(e.message || "방 입장 실패"); }
     };
 
     if ($("joinRoomBtn")) {
@@ -4789,26 +4814,26 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
     }
 
     if ($('riftEnterBattle')) {
-      $('riftEnterBattle').onclick = () => {
-        if (profile.bannedUsers?.[profile.uid]) return toast('⛔ 관리자에 의해 정지된 계정입니다 (UID: ' + profile.uid + ')');
-        if (lobbySubMode === 'duo') {
-          if (!privateRoom) return toast('온라인 협동은 방을 만들거나 방 코드로 입장해야 합니다.');
-          if (privateRoom.hostUid !== profile.uid) return toast('방장이 전투를 시작할 때 자동으로 입장합니다.');
-          if (!privateRoom.guest) return toast('다른 플레이어가 입장할 때까지 기다려 주세요.');
-          if (privateRoom) {
-            privateRoom.status = 'playing';
-            broadcastEvent('roomStart', { roomId: privateRoom.roomId });
-            broadcastEvent('roomUpdate', privateRoom);
-          }
-          isInfiniteMode = true;
-          setMode('duo');
-        }
-        showScreen(2);
-        window.start();
-      };
-    }
-
-    $('prayGrailBtn').onclick = () => {
+       $('riftEnterBattle').onclick = async () => {
+         if (profile.bannedUsers?.[profile.uid]) return toast('⛔ 관리자에 의해 정지된 계정입니다 (UID: ' + profile.uid + ')');
+         if (lobbySubMode === 'duo') {
+           if (!privateRoom) return toast('온라인 협동은 방을 만들거나 방 코드로 입장해야 합니다.');
+           if (privateRoom.hostUid !== profile.uid) return toast('방장이 시작하면 자동 입장합니다. 잠시 기다려 주세요.');
+           const button=$('riftEnterBattle');if(button)button.disabled=true;
+           try {
+             const serverRoom=await readRoomMeta(privateRoom.roomId);
+             if (!serverRoom || serverRoom.hostUid !== profile.uid) throw new Error('서버에서 방을 찾지 못했습니다. 방을 다시 만드세요.');
+             const guest=serverRoom.guest || privateRoom.guest;
+             if (!guest?.uid || guest.uid===profile.uid) throw new Error('상대가 방에 들어올 때까지 기다려 주세요.');
+             privateRoom={...serverRoom,guest,status:'playing'};duoPartnerInfo=guest;
+             await writeRoomMeta(privateRoom.roomId,privateRoom);
+             broadcastEvent('roomStart',{roomId:privateRoom.roomId});
+             isInfiniteMode=true;setMode('duo');
+           } catch(e){toast(e.message||'멀티 시작 실패');if(button?.isConnected)button.disabled=false;return}
+         }
+         showScreen(2);window.start();
+       };
+     }$('prayGrailBtn').onclick = () => {
       if (grailChance <= 0) { riftGachaMode = 'relic'; showScreen(1); return; }
       const todayKey = `grail-${shopSeed}`;
       if (profile.lastGrailDate === todayKey) return toast('오늘 이미 성배 기도를 진행했어요 (내일 다시 가능)');
@@ -6523,7 +6548,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       rate: 0.58,
       range: 335,
       style: 'slow',
-      desc: '황금 시계바늘 투사체 · 시간 정지소로 전장 전체 일반 몬스터 3초 정지 & 아군 스킬 쿨타임 20% 단축(멀티 시 우리팀·적 모두 적용)'
+      desc: '황금 시계바늘 투사체 · 시간 정지소로 적 일반 몬스터 3초 정지 · 아군 공속 2배(5초) · 스킬 쿨타임 20% 단축'
     },
     {
       name: '레이븐: 사신',
@@ -6597,7 +6622,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
 
   Object.assign(fullSkills, {
     31: ['원형 콘서트 · 피날레 앙코르', 14, '3초간 초당 10개 음표 발사 & 치명·공속·공격 2배 + 8초간 주위 원형 콘서트 전개(아군 공속+30%, 스킬피해+20%, 2초마다 음파 공격 · 멀티 교차 버프)'],
-    32: ['시간 정지소 · 크로노스 타임스톱', 15, '전장 전체 일반 몬스터 3초간 완전 정지 & 아군 스킬 쿨타임 20% 단축 (멀티 시 우리팀 쿨감 & 상대 전장 몬스터 정지 동시 적용)'],
+    32: ['시간 정지소 · 크로노스 타임스톱', 15, '적 일반 몬스터 3초 정지 · 아군 공속 2배(5초) 및 스킬 쿨타임 20% 단축. 멀티에서는 양쪽 아군에게 적용'],
     33: ['영혼수확 · 데스 사이드', 11, '심연의 사신 결계를 펼치고 거대한 해골 사신의 낫으로 전장을 X자로 갈라 저체력 일반 몬스터 즉시 처치(영혼 흡수) · 보스에게 평타 1250% 추가 피해'],
     34: ['자동포탑님 · 오토 터렛 MK-V', 14, '12초 동안 유지되며 전장의 적을 자동 추적해 고속 기관포와 유도탄을 발사하는 자동포탑 설치'],
     35: ['여우불 난무 · 구미 청염진', 10.5, '푸른 여우불 9개가 생성되어 적을 자동 추적해 연쇄 폭발하며 광역 청염 피해 부여'],
@@ -6778,7 +6803,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
           if (ally.id !== u.id && ally.skillTimer > 0) {
             ally.skillTimer = Math.max(0.15, ally.skillTimer * 0.8);
           }
-          ally.chronoHaste = 3.0;
+          ally.chronoHaste = Math.max(ally.chronoHaste || 0, 5.0);
         }
         for (const e of tb.enemies) {
           const ep = path(e.p);
@@ -6793,7 +6818,7 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
           spawnHitBurst(tbi, ep.x, ep.y, CHRONO_MAGE, u.r, true);
         }
         activeSkillAnims.push({ bi: tbi, type: 'chronoTimeStop', x: 400, y: 200, cx: c.x, cy: c.y, life: 3.0, max: 3.0 });
-        pop(tbi, 400, 155, '⏳ 시간 정지소! (일반몹 3초 정지 · 아군 쿨타임 -20%)', '#ffe082', true);
+        pop(tbi, 400, 155, '⏳ 적 3초 정지 · 아군 공속 2배 (5초)!', '#ffe082', true);
       });
       return;
     }
@@ -6897,7 +6922,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
           vx: Math.cos(ang) * 90,
           vy: Math.sin(ang) * 90,
           delay: k * 0.09,
-          life: 2.2,
+          life: 3.4,
+          wait: 0,
           idx: k,
           dmg: damage(u, b) * 2.4 * skMult
         });
@@ -7371,6 +7397,11 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       const b = boards[bi];
       for (const u of b.units) {
         u.concertBuff = Math.max(0, (u.concertBuff || 0) - dt);
+        if ((u.chronoHaste || 0) > 0) {
+          // The base engine already advances cooldown by dt. This extra dt doubles basic attack speed.
+          u.cd = Math.max(0, (u.cd || 0) - dt);
+          u.coopCd = Math.max(0, (u.coopCd || 0) - dt);
+        }
         u.chronoHaste = Math.max(0, (u.chronoHaste || 0) - dt);
       }
     }
@@ -7537,11 +7568,15 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
         continue;
       }
       const b = boards[ff.bi];
-      if (!b || !b.enemies.length) {
-        activeFoxFires.splice(i, 1);
+      if (!b) { activeFoxFires.splice(i, 1); continue; }
+      if (!b.enemies.length) {
+        ff.wait = (ff.wait || 0) + dt;
+        if (ff.wait > 5) activeFoxFires.splice(i, 1);
         continue;
       }
-      const target = b.enemies[ff.idx % b.enemies.length] || b.enemies[0];
+      const liveTargets=b.enemies.filter(e=>e.hp>0);
+      if (!liveTargets.length) continue;
+      const target = liveTargets[ff.idx % liveTargets.length];
       const tp = path(target.p);
       const dx = tp.x - ff.x, dy = tp.y - ff.y;
       const dist = Math.hypot(dx, dy);
@@ -7559,7 +7594,8 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
         if(ff.idx===0) {pop(ff.bi,tp.x,tp.y-22,`🦊 청염 9연쇄! ${Math.round(ff.dmg)}`,'#64ffda',false);playHitSfx(GUMIHO_YUHWA,4,true);}
         activeFoxFires.splice(i, 1);
       } else {
-        const spd = 440;
+        const spd = 340;
+        ff.prevX=ff.x; ff.prevY=ff.y;
         ff.x += (dx / dist) * spd * dt;
         ff.y += (dy / dist) * spd * dt;
       }
@@ -7700,8 +7736,13 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
 
     // Pre-rendered blue foxfire stamp — very cheap repeated draw and no per-frame shadowBlur.
     for (const ff of activeFoxFires) {
-      if (ff.bi !== bi || ff.delay>0) continue;
-      ctx.drawImage(foxFireStamp, Math.round(ff.x)-27, Math.round(ff.y)-27,54,54);
+      if (ff.bi !== bi) continue;
+      ctx.save();
+      ctx.globalAlpha=ff.delay>0?.55:1;
+      const pulse=ff.delay>0?24:31+Math.sin(t*8+ff.idx)*3;
+      if(ff.prevX!==undefined){ctx.strokeStyle='#73f9e7';ctx.lineWidth=5;ctx.shadowColor='#42edee';ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(ff.prevX,ff.prevY);ctx.lineTo(ff.x,ff.y);ctx.stroke()}
+      ctx.drawImage(foxFireStamp,Math.round(ff.x-pulse),Math.round(ff.y-pulse),pulse*2,pulse*2);
+      ctx.restore();
     }
 
     // Draw Raven's Harvested Soul Orbs flying from executed monsters to Raven!
@@ -9413,22 +9454,31 @@ const enhancedDemo=demo.onclick;demo.onclick=()=>{const b=board(),u=b?.units.fin
       $('admMailBody').value = '';
       const composer = document.createElement('div');
       composer.className = 'adm-attachment-composer';
-      composer.innerHTML = `<h3>첨부 옵션 직접 추가</h3>
+      composer.innerHTML = `<h3>수신자와 첨부 옵션</h3><div class="adm-grid-2col"><input id="admMailTargetUid" type="text" placeholder="받는 사람 UID (예: UID-123456)" autocomplete="off"><select id="admMailRecipient"><option value="">대상 직접 입력</option><option value="${profile.uid}">나에게 보내기 · ${profile.uid}</option>${[...onlineUsersMap.values()].filter(u=>u?.uid&&u.uid!==profile.uid).map(u=>`<option value="${u.uid}">${u.name||u.uid} · ${u.uid}</option>`).join('')}</select></div>
         <div class="adm-grid-2col"><select id="admAddType"><option value="">옵션 선택</option><option value="gems">💎 보석</option><option value="gold">🪙 골드</option>${kinds.map((k,i)=>`<option value="char:${i}">🧩 ${k.name} 조각</option>`).join('')}${RELIC_LIST.map((r,i)=>`<option value="relic:${i}">🏺 ${r.name} 조각</option>`).join('')}</select>
         <input id="admAddQty" type="number" min="1" max="99999999" placeholder="수량 입력" value=""></div>
         <button id="admAddAttachment" type="button">＋ 선택한 옵션 추가</button>
         <div id="admAttachmentList" class="adm-attachment-list">추가한 첨부가 없습니다.</div>`;
       $('admSendMailBtn').before(composer);
+      $('admMailRecipient').onchange=e=>{if(e.target.value)$('admMailTargetUid').value=e.target.value};
       const items=[];
       const render=()=>{const host=$('admAttachmentList');host.innerHTML='';if(!items.length){host.textContent='추가한 첨부가 없습니다.';return;}items.forEach((a,i)=>{const row=document.createElement('div');row.className='adm-added-row';const label=document.createElement('span');label.textContent=`${a.label} × ${a.count.toLocaleString()}`;const del=document.createElement('button');del.type='button';del.textContent='삭제';del.onclick=()=>{items.splice(i,1);render()};row.append(label,del);host.append(row)});};
       $('admAddAttachment').onclick=()=>{const select=$('admAddType'),value=select.value,n=Number($('admAddQty').value);if(!value||!Number.isSafeInteger(n)||n<1||n>99999999)return toast('옵션과 1~99,999,999 사이 수량을 선택하세요');items.push({type:value,count:n,label:select.selectedOptions[0].textContent});select.value='';$('admAddQty').value='';render();};
       const send=$('admSendMailBtn'),fresh=send.cloneNode(true);send.replaceWith(fresh);
       fresh.textContent='📨 작성한 우편 보내기';
-      fresh.onclick=()=>{const title=$('admMailTitle').value.trim(),body=$('admMailBody').value.trim();if(!title||!body)return toast('우편 제목과 내용을 입력하세요');
-        const attachments=items.filter(x=>x.type.startsWith('char:')||x.type.startsWith('relic:')).map(x=>({type:x.type.split(':')[0],id:Number(x.type.split(':')[1]),count:x.count}));
-        const sum=kind=>items.filter(x=>x.type===kind).reduce((n,x)=>n+x.count,0);
-        profile.mailbox.unshift({id:'mail-'+Date.now(),type:$('admMailType').value,sender:'관리자',title,body,gems:sum('gems'),gold:sum('gold'),attachments,claimed:false});
-        saveProfile();toast('📨 선택한 옵션을 우편함으로 보냈습니다');openMailboxModal();};
+      fresh.onclick=async()=>{const title=$('admMailTitle').value.trim(),body=$('admMailBody').value.trim();
+         const target=$('admMailTargetUid').value.trim();
+         if(!title||!body)return toast('우편 제목과 내용을 입력하세요');
+         if(!/^UID-[0-9]{6}$/.test(target))return toast('받는 사람 UID를 입력하세요 (예: UID-123456)');
+         const attachments=items.filter(x=>x.type.startsWith('char:')||x.type.startsWith('relic:')).map(x=>({type:x.type.split(':')[0],id:Number(x.type.split(':')[1]),count:x.count}));
+         const sum=kind=>items.filter(x=>x.type===kind).reduce((n,x)=>n+x.count,0);
+         const mail={id:'mail-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),type:$('admMailType').value,
+           sender:'관리자',title,body,gems:sum('gems'),gold:sum('gold'),attachments,claimed:false};
+         fresh.disabled=true;fresh.textContent='서버로 전송 중…';
+         try { await writeRemoteMail(target,mail);toast(`📨 ${target} 우편함으로 전송했습니다`);
+           if(target===profile.uid){profile.mailbox.unshift(mail);saveProfile();openMailboxModal()}
+           else {fresh.textContent='전송 완료';setTimeout(()=>{if(fresh.isConnected){fresh.disabled=false;fresh.textContent='📨 작성한 우편 보내기'}},1600)}
+         } catch(e){fresh.disabled=false;fresh.textContent='📨 다시 보내기';toast(e.message||'서버 전송 실패')} };
     }
 
     const topCtrl = document.createElement('section');
@@ -10392,7 +10442,24 @@ window.drawBoard=function(b,bi,t){previousNewDraw(b,bi,t);ctx.save();ctx.transla
  for(const f of newSpellFx){if(f.bi!==bi)continue;const a=Math.max(0,f.life/f.duration),p=1-a;ctx.save();ctx.globalAlpha=Math.min(1,a*1.6);ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=16;
  if(f.key==='celia'||f.key==='rico'){const r=(f.key==='celia'?240:220)*(.2+.8*p);ctx.lineWidth=2+4*a;ctx.beginPath();ctx.arc(f.x,f.y,r,0,Math.PI*2);ctx.stroke();for(let i=0;i<12;i++){let ang=i*Math.PI/6+t*.001,rr=r*.8;ctx.beginPath();ctx.arc(f.x+Math.cos(ang)*rr,f.y+Math.sin(ang)*rr,3+4*a,0,7);ctx.fill()}if(f.key==='rico')for(let i=0;i<6;i++){const ang=i*1.05-p*4;ctx.beginPath();ctx.arc(f.x+Math.cos(ang)*r*.55,f.y+Math.sin(ang)*r*.55,6,0,7);ctx.fill()}}
  else if(f.key==='riel'){ctx.lineWidth=4*a+1;for(const q of f.targets){const angle=Math.atan2(q.y-f.y,q.x-f.x);ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(q.x,q.y);ctx.stroke();for(let i=0;i<6;i++){let ang=i*Math.PI/3+p*3;ctx.beginPath();ctx.moveTo(q.x+Math.cos(ang)*8,q.y+Math.sin(ang)*8);ctx.lineTo(q.x+Math.cos(ang)*30*a,q.y+Math.sin(ang)*30*a);ctx.stroke()}}}
- else if(f.key==='kagura'){for(const q of f.targets){const r=20+43*p;ctx.lineWidth=4+3*a;ctx.shadowBlur=24;ctx.beginPath();ctx.arc(q.x,q.y,r,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(q.x-r,q.y-r);ctx.lineTo(q.x+r,q.y+r);ctx.moveTo(q.x+r,q.y-r);ctx.lineTo(q.x-r,q.y+r);ctx.stroke();for(let i=0;i<4;i++){let ang=i*Math.PI/2+t*.002;ctx.fillRect(q.x+Math.cos(ang)*r-3,q.y+Math.sin(ang)*r-6,6,12)}}}
+ else if(f.key==='kagura'){
+   for(let n=0;n<f.targets.length;n++){
+     const q=f.targets[n],r=17+46*p,phase=t*2+n*1.3;
+     ctx.save();ctx.globalAlpha=a;ctx.shadowColor='#ff6aa5';ctx.shadowBlur=20;
+     // Each of the five seals is delivered by a curved foxfire trail.
+     ctx.strokeStyle='#ffbbcf';ctx.lineWidth=2+2*a;
+     ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.quadraticCurveTo((f.x+q.x)/2+Math.sin(phase)*30,(f.y+q.y)/2-65,q.x,q.y);ctx.stroke();
+     ctx.translate(q.x,q.y);ctx.rotate(p*.7*(n%2?1:-1));
+     ctx.fillStyle='rgba(77,9,56,.32)';ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+     ctx.strokeStyle='#ffe5b2';ctx.lineWidth=2.4;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
+     ctx.strokeStyle='#ff7ea9';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r*.74,0,Math.PI*2);ctx.stroke();
+     ctx.beginPath();for(let k=0;k<5;k++){const h=-Math.PI/2+k*Math.PI*2/5;const x=Math.cos(h)*r*.75,y=Math.sin(h)*r*.75;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();
+     ctx.rotate(-p*.7*(n%2?1:-1));ctx.fillStyle='#fff3dd';ctx.font='bold 19px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('封',0,1);
+     for(let k=0;k<5;k++){const h=phase+k*Math.PI*2/5,px=Math.cos(h)*(r+10),py=Math.sin(h)*(r+10);
+       ctx.fillStyle=k%2?'#ff83b9':'#ffeac0';ctx.beginPath();ctx.ellipse(px,py,4+2*a,8+2*a,h,0,Math.PI*2);ctx.fill();}
+     ctx.restore();
+   }
+ }
  for(let i=0;i<9;i++){const ang=i*2.39996+f.x*.07,rad=(12+90*p)*(i%3+1)/3;ctx.globalAlpha=a*(.35+.5*(i%2));ctx.fillStyle=i%3===0?'#fffdf0':f.color;const px=f.x+Math.cos(ang)*rad,py=f.y+Math.sin(ang)*rad;ctx.beginPath();ctx.arc(px,py,2.5+2.5*a,0,7);ctx.fill()}
  ctx.restore()}
  ctx.restore();};
@@ -10521,7 +10588,7 @@ console.info('[Lucky Rift] UX patch and added characters',kinds.length,window.ri
  const quick=document.createElement('div');quick.id='riftQuickBar';quick.innerHTML='<button type="button" data-quick="summon"><strong>🎲 소환</strong><small id="riftQuickCost">◈</small></button><button type="button" data-quick="lucky"><strong>🍀 행운 소환</strong><small>✦ 2</small></button><button type="button" data-quick="pause"><strong id="riftQuickPause">Ⅱ 일시정지</strong></button>';
  document.body.append(quick);
  quick.onclick=e=>{const b=e.target.closest('[data-quick]');if(!b)return;const id={summon:'v4BtnSummon',lucky:'v4BtnGamble',pause:'pause'}[b.dataset.quick];document.getElementById(id)?.click();sync();};
- function sync(){const cost=document.getElementById('v4ValSummon')?.textContent||'◈';const costEl=document.getElementById('riftQuickCost');if(costEl)costEl.textContent=cost;const p=document.getElementById('riftQuickPause');if(p)p.textContent=paused?'▶ 계속':'Ⅱ 일시정지';const b=board();quick.querySelector('[data-quick="summon"]').disabled=!running||paused||!b||b.units.length>=20||b.gold<cost(b);quick.querySelector('[data-quick="lucky"]').disabled=!running||paused||!b||b.gems<2;}
+ function sync(){const priceLabel=document.getElementById('v4ValSummon')?.textContent||'◈';const costEl=document.getElementById('riftQuickCost');if(costEl)costEl.textContent=priceLabel;const p=document.getElementById('riftQuickPause');if(p)p.textContent=paused?'▶ 계속':'Ⅱ 일시정지';const b=board();quick.querySelector('[data-quick="summon"]').disabled=!running||paused||!b||b.units.length>=20||b.gold<cost(b);quick.querySelector('[data-quick="lucky"]').disabled=!running||paused||!b||b.gems<2;}
  const oldUpdate=window.update;window.update=function(...args){const result=oldUpdate.apply(this,args);sync();return result};sync();
  // Apply semantic pressed state to the two skin switches whenever they change.
  const observer=new MutationObserver(()=>{document.querySelectorAll('.rift-skin-choice button').forEach(b=>b.setAttribute('aria-pressed',String(b.classList.contains('active'))));});
@@ -10618,7 +10685,7 @@ console.info('[Lucky Rift] UX patch and added characters',kinds.length,window.ri
   function refreshCombat(){const undo=$('riftUndoBtn');if(undo)undo.disabled=!lastSummon||Date.now()-lastSummon.at>7000}
   function masteryHtml(){return `<div class="rift-mission-panel"><h2>캐릭터 숙련도</h2><p>실제 전투에서 기본 공격을 사용할 때 증가합니다. 훈련장은 제외됩니다.</p>${kinds.map((k,j)=>{const n=campaign.mastery[j]||0,level=Math.floor(n/50)+1;return `<div class="rift-mission"><span><b>${escapeHtml(k.name)}</b><small>숙련 Lv.${level} · 공격 ${n}회</small><progress max="50" value="${n%50}"></progress></span></div>`}).join('')}</div>`}
   function installCombat(){const bar=$('riftQuickBar')||document.querySelector('.battle-controls');if(!bar||$('riftCombatTools'))return;const box=document.createElement('div');box.id='riftCombatTools';box.innerHTML='<button id="riftUndoBtn" data-rift-action="undo">소환 취소</button><button data-rift-action="locate">캐릭터 찾기</button><button data-rift-action="restart">다시 시작</button>';bar.after(box);refreshCombat()}
-  function adminTools(){const host=$('modal-content');if(!host?.querySelector('.admin-mail-wrap')||$('riftAdminTools'))return;const el=document.createElement('section');el.id='riftAdminTools';el.className='admin-sec';el.innerHTML='<h3>전투 테스트</h3><div class="rift-admin-grid"><button data-rift-action="adminGold">전투 골드 +1000</button><button data-rift-action="adminStone">행운석 +20</button><button data-rift-action="adminWave">다음 웨이브</button><button data-rift-action="adminBoss">보스 소환</button><button data-rift-action="adminSkill">선택 스킬 즉시 사용</button></div>';host.querySelector('.admin-mail-wrap').append(el)}
+  function adminTools(){ /* 관리자 우편과 계정 도구만 유지 */ }
   const observer=new MutationObserver(()=>{installCombat();adminTools();if(screen.style.display!=='none')decorateLobby()});observer.observe(document.body,{subtree:true,childList:true});installCombat();decorateLobby();
   const openCharacterBeforeComfort=window.openCharacter;
   window.openCharacter=function(j){openCharacterBeforeComfort(j);const detail=$('character-detail'),card=detail?.querySelector('.ccm-card');if(!card)return;
@@ -10831,6 +10898,312 @@ console.info('[Lucky Rift] UX patch and added characters',kinds.length,window.ri
     .rift-standard-unit b{font-size:12px;text-align:center;line-height:1.25;min-height:30px;display:grid;place-items:center;word-break:keep-all}
     .rift-standard-foot{text-align:center;color:#bfdbd2;font-size:11px;margin:6px 0 0}
     @media(max-width:650px){.gacha-banner-box.normal-theme{padding:12px!important}.rift-standard-head h2{font-size:19px}.rift-standard-cast{gap:5px;margin:12px 0 5px}.rift-standard-unit{padding:5px 2px;min-height:132px}.rift-standard-unit canvas{width:min(100%,110px);height:112px}.rift-standard-unit b{font-size:10px;min-height:27px}}
+  </style>`);
+})();
+
+</script>
+<script id="rift-one-screen-unlock">
+/* Acquired-character state and compact battle layout. */
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  profile.unlocked=Array.isArray(profile.unlocked)?profile.unlocked:[];
+  function syncUnlocks(){let changed=false;for(let j=0;j<kinds.length;j++){
+    if(!profile.unlocked[j]&&((profile.shards?.[j]||0)>0||(profile.levels?.[j]||1)>1||(profile.stars?.[j]||0)>0)){
+      profile.unlocked[j]=true;changed=true;
+    }
+  }return changed}
+  syncUnlocks();
+  const saveBefore=window.saveProfile;
+  window.saveProfile=function(){syncUnlocks();return saveBefore()};
+  saveProfile();
+  function decorateCards(){if(screen.style.display==='none')return;screen.querySelectorAll('.roster-card[data-character]').forEach(card=>{
+    const j=Number(card.dataset.character),owned=!!profile.unlocked[j];
+    if(card.dataset.acquired===String(owned))return;
+    card.dataset.acquired=String(owned);card.classList.toggle('rift-locked-character',!owned);
+    let badge=card.querySelector('.rift-acquired-label');if(!badge){badge=document.createElement('span');badge.className='rift-acquired-label';card.append(badge)}
+    badge.textContent=owned?'획득':'🔒 미획득';
+  })}
+  const openBefore=window.openCharacter;
+  window.openCharacter=function(j){const result=openBefore(j),detail=$('character-detail');
+    if(detail&&!profile.unlocked[j]){
+      const header=detail.querySelector('.ccm-header');const notice=document.createElement('div');notice.className='rift-lock-notice';
+      notice.textContent='🔒 미획득 수호자 · 뽑기에서 조각을 얻으면 해금됩니다.';(header||detail.firstElementChild)?.after(notice);
+      detail.querySelectorAll('#detailLevel,#detailMaxLevel,#detailPromote,#detailMaxPromote').forEach(btn=>btn.disabled=true);
+    }
+    return result};
+  function installBattleTools(){const arena=$('game')?.closest('.arena-panel');if(!arena||$('riftBattleMenuToggle'))return;
+    const controls=arena.querySelector('.arena-top .controls');
+    const menu=document.createElement('button');menu.id='riftBattleMenuToggle';menu.type='button';menu.textContent='⚙ 메뉴';menu.setAttribute('aria-expanded','false');
+    menu.onclick=()=>{const open=document.body.classList.toggle('rift-menu-open');menu.setAttribute('aria-expanded',String(open));menu.textContent=open?'✕ 닫기':'⚙ 메뉴'};
+    controls?.append(menu);
+    const party=document.createElement('button');party.id='riftPartyToggle';party.type='button';party.textContent='💬 파티';party.setAttribute('aria-expanded','false');
+    party.onclick=()=>{const open=document.body.classList.toggle('rift-party-open');party.setAttribute('aria-expanded',String(open));party.textContent=open?'✕ 채팅 닫기':'💬 파티'};
+    controls?.append(party);
+    const compact=document.createElement('div');compact.id='riftCompactHud';compact.innerHTML='<span id="riftCompactGold">◈ 0</span><span id="riftCompactStone">✦ 0</span><span id="riftCompactPop">0/20명</span>';
+    arena.querySelector('.wavebar')?.append(compact);
+    const acquire=document.createElement('button');acquire.id='riftAcquirePrompt';acquire.type='button';acquire.textContent='🔒 보유 수호자 없음 · 뽑기에서 획득하기 →';acquire.onclick=()=>showScreen(1);arena.querySelector('.canvas-wrap')?.before(acquire);
+  }
+  installBattleTools();
+  const updateBefore=window.update;
+  window.update=function(...args){const result=updateBefore.apply(this,args);const b=board();if(b){
+    if($('riftCompactGold'))$('riftCompactGold').textContent='◈ '+Math.floor(b.gold);
+    if($('riftCompactStone'))$('riftCompactStone').textContent='✦ '+Math.round(b.gems);
+    if($('riftCompactPop'))$('riftCompactPop').textContent=b.units.length+'/20명';
+  }
+  if($('riftPartyToggle'))$('riftPartyToggle').hidden=mode!=='duo';
+  if($('riftAcquirePrompt'))$('riftAcquirePrompt').hidden=profile.unlocked.some(Boolean);
+  return result};
+  const showBefore=window.showScreen;
+  window.showScreen=function(i){const result=showBefore(i);if(i!==2){document.body.classList.remove('rift-menu-open','rift-party-open')}if(i===4)decorateCards();return result};
+  const observer=new MutationObserver(()=>{if(screen.style.display!=='none')decorateCards()});observer.observe(screen,{subtree:true,childList:true});decorateCards();
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .roster-card.rift-locked-character canvas{filter:grayscale(1) brightness(.43)}
+    .roster-card.rift-locked-character{border-color:#6a7b84!important;background:linear-gradient(#3f4b51,#28383f)!important}
+    .rift-acquired-label{display:block;margin-top:auto;padding:2px 5px;border-radius:7px;background:#244f42;color:#d7f5bf;font-size:9px;font-weight:900}
+    .rift-locked-character .rift-acquired-label{background:#17272d;color:#b8c6ca}
+    .rift-lock-notice{padding:10px 12px;margin:12px 0;border:1px solid #8d9ba2;border-radius:10px;background:#1a2c35;color:#e2ebed;font-weight:800;font-size:12px}
+    #riftCompactHud{display:none}
+    #riftBattleMenuToggle,#riftPartyToggle{min-height:38px;padding:5px 8px;border:1px solid #74959a;border-radius:9px;background:#24414b;color:#e8f4ee;font-weight:800}
+    #riftAcquirePrompt{display:block;width:100%;margin:3px 0;padding:9px;background:#34515a;border:1px solid #a5c7aa;border-radius:9px;color:#f4ffd8;font-weight:900}
+    #riftAcquirePrompt[hidden]{display:none}
+    @media(max-width:650px){
+      body.battle-view .app-nav{display:none!important}
+      body.battle-view main{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+      body.battle-view .layout{margin:0 3px!important;display:block!important}
+      body.battle-view .arena-panel{width:100%!important;margin:0!important}
+      body.battle-view .arena-top{padding:6px 7px!important;min-height:40px;gap:5px;flex-wrap:nowrap!important}
+      body.battle-view .arena-top>div:first-child{min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden}
+      body.battle-view .arena-top b{font-size:11px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      body.battle-view .arena-top .controls{display:flex!important;align-items:center;gap:4px;flex-wrap:nowrap!important}
+      body.battle-view .arena-top .controls button{font-size:11px!important;min-width:34px;min-height:36px;padding:4px 6px!important}
+      body.battle-view .wavebar{padding:5px 8px!important;display:grid!important;grid-template-columns:auto 1fr auto;gap:5px!important;align-items:center;min-height:47px}
+      body.battle-view .wavebar>div{min-width:0}body.battle-view .wavebar small{font-size:9px!important}
+      body.battle-view .wavebar strong{font-size:19px!important}body.battle-view .wavebar .timer{font-size:11px!important}
+      body.battle-view .wavebar .threat .track{display:none!important}
+      body.battle-view #riftCompactHud{display:flex;grid-column:1/-1;justify-content:space-around;gap:4px;border-top:1px solid #ffffff28;padding:3px 0 0;font-size:11px;font-weight:900;color:#e8eeb7}
+      body.battle-view #battleResourceHud{display:none!important}
+      body.battle-view #duoCoopBar{display:none!important}
+      body.battle-view.rift-party-open #duoCoopBar:not([hidden]){display:block!important;position:fixed;z-index:90;left:8px;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));max-height:58dvh;overflow:auto;box-shadow:0 12px 50px #000c}
+      body.battle-view .canvas-wrap{margin:0!important;border-radius:0!important}
+      body.battle-view #game{display:block;width:100%!important;height:auto!important;max-height:calc(100dvh - 190px - env(safe-area-inset-bottom));object-fit:contain}
+      body.battle-view .arena-foot{display:none!important}
+      body.battle-view .mining,body.battle-view .battle-controls{display:none!important}
+      body.battle-view #battleSkillInfo{font-size:11px!important;padding:6px 9px!important;min-height:0!important}
+      body.battle-view:not(.rift-menu-open) aside,
+      body.battle-view:not(.rift-menu-open) #riftPanelTabs,
+      body.battle-view:not(.rift-menu-open) #riftCombatTools{display:none!important}
+      body.battle-view #riftQuickBar{bottom:env(safe-area-inset-bottom)!important;grid-template-columns:1fr 1fr .8fr!important;padding:5px 7px!important}
+      body.battle-view #riftQuickBar button{min-height:42px!important}
+      body.battle-view .arena-panel{padding-bottom:3px!important}
+    }
+  </style>`);
+})();
+
+</script>
+<script id="rift-ai-partner">
+/* Optional offline AI teammate for the two-board endless mode. */
+(()=>{
+  'use strict';
+  let aiTimer=0;
+  function installButton(){
+    if(screen.style.display==='none'||!$('createRoomQuickBtn')||$('riftAiPartnerBtn'))return;
+    const button=document.createElement('button');
+    button.id='riftAiPartnerBtn';button.type='button';button.textContent='🤖 AI 동료와 바로 시작';
+    $('createRoomQuickBtn').after(button);
+    button.onclick=()=>{
+      if(running)return toast('진행 중인 전투를 먼저 종료하세요.');
+      window.riftAiPartnerMode=true;
+      privateRoom=null;
+      duoPartnerInfo={uid:'AI-PARTNER',name:'AI 동료',lv:1,color:'#9fe6ff',favUnit:4,subUnit:8,isReal:false};
+      lobbySubMode='duo';isInfiniteMode=true;setMode('duo');
+      showScreen(2);window.start();
+      toast('🤖 AI 동료와 협동 전투를 시작했어요. 아래 전장은 AI가 자동으로 소환합니다.');
+    };
+  }
+  const priorShow=window.showScreen;
+  window.showScreen=function(i){const result=priorShow(i);if(i===0)installButton();return result};
+  const priorTick=window.tick;
+  window.tick=function(dt){
+    const result=priorTick(dt);
+    if(!window.riftAiPartnerMode||mode!=='duo'||privateRoom||!running||paused||!boards[1])return result;
+    aiTimer-=dt;
+    if(aiTimer>0)return result;
+    const bot=boards[1];
+    aiTimer=1.15+Math.random()*.6;
+    const targetCount=Math.min(19,4+Math.floor(wave/2));
+    let cell=freeCell(bot);
+    if(bot.units.length>=20&&cell<0){
+      const oldest=bot.units.slice().sort((a,b)=>a.r-b.r||a.id-b.id)[0];
+      if(oldest){bot.units=bot.units.filter(u=>u!==oldest);bot.gold+=30;cell=oldest.cell;}
+    }
+    if(cell>=0&&bot.units.length<targetCount&&bot.gold>=40){
+      const rank=wave>=16&&Math.random()<.20?2:wave>=7&&Math.random()<.36?1:0;
+      const kind=randomKind(rank);
+      if(Number.isInteger(kind)){
+        bot.gold-=40;
+        addUnit(bot,kind,rank,cell,false);
+        if(bot.units.length===1)toast('🤖 AI 동료가 아래 전장에 수호자를 소환했어요.');
+      }
+    }else if(bot.gold>=120){
+      bot.gold-=120;bot.level=Math.min(12,(bot.level||0)+1);
+    }
+    return result;
+  };
+  const priorStart=window.start;
+  window.start=function(...args){aiTimer=0.3;if(mode!=='duo'||privateRoom)window.riftAiPartnerMode=false;return priorStart.apply(this,args)};
+  const priorUpdate=window.update;
+  window.update=function(...args){const result=priorUpdate.apply(this,args);const toggle=$('riftPartyToggle');if(toggle&&window.riftAiPartnerMode)toggle.hidden=true;return result};
+  const observer=new MutationObserver(()=>{if(screen.style.display!=='none'&&$('createRoomQuickBtn')&&!$('riftAiPartnerBtn'))installButton()});
+  observer.observe(screen,{childList:true,subtree:true});installButton();
+  document.head.insertAdjacentHTML('beforeend','<style>#riftAiPartnerBtn{min-height:46px;padding:10px 14px;margin:8px 0;border:1px solid #72cbd7;border-radius:12px;background:linear-gradient(#245063,#173941);color:#e8fcff;font-weight:900}#riftAiPartnerBtn:hover{filter:brightness(1.12)}</style>');
+})();
+
+</script>
+<script id="rift-battle-controls-v2">
+/* Mobile battle HUD with all frequent actions visible. */
+(()=>{
+  const bar=document.getElementById('riftQuickBar');
+  if(!bar)return;
+  bar.innerHTML=`
+    <button type="button" data-quick="summon"><strong>🎲 소환</strong><small id="riftQuickCost">◈ 40</small></button>
+    <button type="button" data-quick="lucky"><strong>🍀 행운 소환</strong><small>✦ 2</small></button>
+    <button type="button" data-quick="mine"><strong>⛏ 행운석 채굴</strong><small id="riftQuickMine">◈ 150</small></button>
+    <button type="button" data-quick="sell"><strong>💰 판매</strong><small id="riftQuickSell">캐릭터 선택</small></button>
+    <button type="button" data-quick="attack"><strong id="riftQuickAttackStat">⚔ 공격력 +0%</strong><small id="riftQuickAttack">+20% · ◈ 100</small></button>
+    <button type="button" data-quick="haste"><strong id="riftQuickHasteStat">⚡ 공속 +0%</strong><small id="riftQuickHaste">+12% · ◈ 100</small></button>
+    <button type="button" data-quick="chance"><strong id="riftQuickChanceStat">✦ 영웅 9% · 신화 1%</strong><small id="riftQuickChance">다음 확률 · ◈ 120</small></button>`;
+  const actions={summon:'v4BtnSummon',lucky:'v4BtnGamble',mine:'v4BtnMine',sell:'v4BtnSell',attack:'v4BtnAtk',haste:'v4BtnHaste',chance:'v4BtnChance'};
+  bar.onclick=e=>{const button=e.target.closest('[data-quick]');if(!button||button.disabled)return;document.getElementById(actions[button.dataset.quick])?.click()};
+  const previousUpdate=window.update;
+  window.update=function(...args){const result=previousUpdate.apply(this,args),b=board();if(!b)return result;
+    const write=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value};
+    write('riftCompactGold','골드 ◈ '+Math.floor(b.gold).toLocaleString());
+    write('riftCompactStone','행운석 ✦ '+Math.floor(b.gems).toLocaleString());
+    write('riftCompactPop',b.units.length+'/20명');
+    write('riftQuickCost','◈ '+cost(b));
+    const mineCost=Number((document.getElementById('v4ValMine')?.textContent||'150').replace(/[^0-9]/g,''))||150;
+    write('riftQuickMine','◈ '+mineCost);
+    const chosen=b.units.find(u=>u.id===selected);
+    write('riftQuickSell',chosen?'◈ +'+Math.round(20*Math.pow(2.5,chosen.r)):'캐릭터 선택');
+    write('riftQuickAttackStat','⚔ 공격력 +'+(b.level*20)+'%');
+    write('riftQuickAttack','다음 +20% · ◈ '+(100+b.level*75));
+    write('riftQuickHasteStat','⚡ 공속 +'+(b.haste*12)+'%');
+    write('riftQuickHaste','다음 +12% · ◈ '+(100+b.haste*100));
+    const now=probabilities(b),next=probabilities({summonLevel:b.summonLevel+1});
+    write('riftQuickChanceStat',`✦ 영웅 ${Math.round(now[2]*100)}% · 신화 ${Math.round(now[3]*100)}%`);
+    write('riftQuickChance',b.summonLevel>=4?'최대 단계':`다음 ${Math.round(next[2]*100)}% · ${Math.round(next[3]*100)}% · ◈ ${120+b.summonLevel*100}`);
+    const costs={summon:cost(b),lucky:0,mine:mineCost,
+      attack:100+b.level*75,haste:100+b.haste*100,chance:120+b.summonLevel*100};
+    bar.querySelectorAll('[data-quick]').forEach(btn=>{const k=btn.dataset.quick;
+      btn.disabled=!running||paused||(k==='sell'?!chosen:k==='lucky'?b.gems<2:k==='summon'?b.units.length>=20||b.gold<costs[k]:k==='chance'?b.summonLevel>=4||b.gold<costs[k]:b.gold<costs[k]);
+    });
+    return result;
+  };
+  window.update();
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    body.battle-view #riftCompactHud{display:grid!important;grid-template-columns:1.1fr 1.1fr .8fr;gap:5px;border:0;padding:4px 0 0}
+    body.battle-view #riftCompactHud span{display:flex;align-items:center;justify-content:center;min-width:0;min-height:34px;padding:3px 5px;border:1px solid #73969c;border-radius:9px;background:#123440;color:#fff6bb;font-size:13px;font-weight:900;white-space:nowrap}
+    body.battle-view #riftCompactStone{color:#95fff2!important;border-color:#4abccc!important}
+    body.battle-view #riftQuickBar{display:grid!important;grid-template-columns:repeat(12,minmax(0,1fr))!important;gap:5px!important;padding:6px max(6px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))!important;background:#112b33f5}
+    body.battle-view #riftQuickBar [data-quick]{grid-column:span 3}
+    body.battle-view #riftQuickBar [data-quick="attack"],body.battle-view #riftQuickBar [data-quick="haste"],body.battle-view #riftQuickBar [data-quick="chance"]{grid-column:span 4}
+    body.battle-view #riftQuickBar button{min-width:0!important;min-height:42px!important;padding:4px 2px!important}
+    body.battle-view #riftQuickBar strong{font-size:10px!important;white-space:normal!important;text-align:center;line-height:1.2}
+    body.battle-view #riftQuickBar small{font-size:9px!important;white-space:normal;text-align:center;line-height:1.25}
+    body.battle-view #riftQuickBar [data-quick="mine"]{background:#1d5762;color:#e4fff2;border-color:#59c5bf}
+    body.battle-view #riftQuickBar [data-quick="chance"]{background:#433352;color:#fff1ff;border-color:#ab78c8}
+    body.battle-view main{padding-bottom:calc(105px + env(safe-area-inset-bottom))!important}
+    body.battle-view #game{max-height:calc(100dvh - 240px - env(safe-area-inset-bottom))!important}
+  </style>`);
+})();
+
+</script>
+<script id="rift-synergy-only">
+/* One-button view of the synergies that are active on the current board. */
+(()=>{
+  const menu=document.getElementById('riftBattleMenuToggle');
+  if(!menu)return;
+  document.body.classList.remove('rift-menu-open');
+  menu.id='riftSynergyToggle';menu.textContent='✦ 시너지';menu.setAttribute('aria-expanded','false');
+  const sheet=document.createElement('section');sheet.id='riftActiveSynergySheet';sheet.hidden=true;
+  sheet.innerHTML='<div class="rift-synergy-head"><b>현재 발동 시너지</b><button type="button" aria-label="닫기">✕</button></div><div id="riftActiveSynergyList"></div>';
+  document.body.append(sheet);
+  const close=()=>{sheet.hidden=true;menu.setAttribute('aria-expanded','false')};
+  sheet.querySelector('button').onclick=close;
+  function render(){
+    const state=window.riftSynergy?.(),traits=window.riftTraits||{};
+    const host=document.getElementById('riftActiveSynergyList');host.replaceChildren();
+    const active=state?.active||[];
+    for(const tag of active){
+      const n=state.counts[tag],level=n>=6?3:n>=4?2:1,meta=traits[tag];if(!meta)continue;
+      const row=document.createElement('div');row.className='rift-active-synergy';
+      const name=document.createElement('strong');name.textContent=`${meta.icon} ${tag} ${n}명`;
+      const effect=document.createElement('span');effect.textContent=meta.effects[level-1];
+      row.append(name,effect);host.append(row);
+    }
+    for(const combo of state?.combos||[]){
+      const row=document.createElement('div');row.className='rift-active-synergy special';
+      const name=document.createElement('strong');name.textContent=`${combo.icon} ${combo.name}`;
+      const effect=document.createElement('span');effect.textContent=combo.desc;
+      row.append(name,effect);host.append(row);
+    }
+    if(!host.childElementCount){const empty=document.createElement('p');empty.textContent='아직 발동한 시너지가 없어요. 서로 다른 캐릭터를 모아 보세요.';host.append(empty)}
+  }
+  menu.onclick=()=>{if(!sheet.hidden){close();return}render();sheet.hidden=false;menu.setAttribute('aria-expanded','true')};
+  const oldShow=window.showScreen;
+  window.showScreen=function(i){close();return oldShow(i)};
+  document.addEventListener('pointerdown',e=>{if(!sheet.hidden&&!sheet.contains(e.target)&&e.target!==menu)close()});
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    #riftSynergyToggle{min-height:38px;padding:5px 8px;border:1px solid #d3b977;border-radius:9px;background:#494537;color:#fff0ba;font-weight:900}
+    #riftActiveSynergySheet{position:fixed;z-index:92;left:8px;right:8px;bottom:calc(110px + env(safe-area-inset-bottom));max-width:680px;max-height:48dvh;overflow:auto;margin:auto;padding:12px;background:#152e37;border:2px solid #c2b682;border-radius:14px;color:#ecf6ee;box-shadow:0 10px 35px #000b}
+    #riftActiveSynergySheet[hidden]{display:none!important}
+    .rift-synergy-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .rift-synergy-head b{color:#ffe3a4;font-size:15px}.rift-synergy-head button{min-width:36px;min-height:32px;background:#2b4650;color:white;border-radius:8px}
+    .rift-active-synergy{display:flex;justify-content:space-between;gap:9px;padding:9px 4px;border-bottom:1px solid #ffffff25;font-size:12px}
+    .rift-active-synergy strong{white-space:nowrap;color:#dcf3a7}.rift-active-synergy.special strong{color:#ffd590}
+    #riftActiveSynergyList p{margin:10px 0;font-size:12px;color:#cbd7d2}
+    body.battle-view #riftPanelTabs,body.battle-view aside,body.battle-view #riftCombatTools{display:none!important}
+  </style>`);
+})();
+
+</script>
+<script id="rift-mining-synergy-visibility">
+/* Restore the live mining gauge and put synergy beside it on narrow screens. */
+(()=>{
+  const wavebar=document.querySelector('.arena-panel .wavebar');
+  const mining=document.getElementById('cleanMiningBar');
+  const synergy=document.getElementById('riftSynergyToggle');
+  if(!wavebar||!mining||!synergy)return;
+  wavebar.append(mining);
+  mining.append(synergy);
+  synergy.textContent='✦ 시너지';
+  const previousUpdate=window.update;
+  window.update=function(...args){
+    const result=previousUpdate.apply(this,args),b=board();
+    if(b){
+      const label=document.getElementById('cmLeft'),value=document.getElementById('cmRight');
+      if(label)label.textContent='⛏ 행운석';
+      if(value)value.textContent=b.mineUnlocked?`+${Math.max(1,Math.round(1+(b.miningLv||0)))}/3초`:'잠김';
+    }
+    return result;
+  };
+  const previousTick=window.tick;
+  window.tick=function(dt){
+    const result=previousTick(dt),b=board(),fill=document.getElementById('cmFill');
+    if(fill&&b)fill.style.width=(b.mineUnlocked?Math.min(100,Math.max(0,(b.mineTimer||0)/3*100)):0)+'%';
+    return result;
+  };
+  window.update();
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    body.battle-view #cleanMiningBar{display:flex!important;grid-column:1/-1;align-items:center!important;gap:7px!important;margin:1px 0 0!important;padding:5px 6px!important;min-width:0;min-height:39px;background:#17343e!important;border:1px solid #5a858a!important;border-radius:9px!important}
+    body.battle-view #cleanMiningBar #cmLeft{flex:none;font-size:11px!important;font-weight:900;color:#b9fbec;white-space:nowrap}
+    body.battle-view #cleanMiningBar .cm-track{flex:1!important;min-width:35px;height:10px!important;border:1px solid #47717a;background:#0b2029!important}
+    body.battle-view #cleanMiningBar #cmFill{background:linear-gradient(90deg,#30b9d4,#69ffe0,#f1ffb0)!important;box-shadow:0 0 8px #67ffe4}
+    body.battle-view #cleanMiningBar #cmRight{flex:none;font-size:10px!important;white-space:nowrap}
+    body.battle-view #cleanMiningBar #riftSynergyToggle{display:inline-flex!important;align-items:center;justify-content:center;flex:none;min-height:30px!important;padding:4px 7px!important;font-size:10px!important;border-color:#dbc57a;background:#48412e;color:#fff0ba;white-space:nowrap}
+    body.battle-view .arena-top #riftSynergyToggle{display:none!important}
+    body.battle-view .wavebar{min-height:0!important}
   </style>`);
 })();
 
